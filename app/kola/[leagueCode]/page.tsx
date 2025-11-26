@@ -17,7 +17,7 @@ type Fixture = {
   league_code: string;
   round: number;
   match_date: string;
-  match_time: string | null;
+  match_time: any; // može biti string ili objekt
   home_team_id: string;
   away_team_id: string;
 };
@@ -42,6 +42,21 @@ const LEAGUE_NAME: Record<LeagueCode, string> = {
   POC_SILVER: "Početnici – Srebrna liga",
 };
 
+// 🔥 Formatiranje vremena (radi i za string i za objekt)
+function formatTime(t: any): string {
+  if (!t) return "";
+
+  if (typeof t === "string") return t.substring(0, 5);
+
+  if (typeof t === "object" && t.hours !== undefined) {
+    const hh = String(t.hours).padStart(2, "0");
+    const mm = String(t.minutes).padStart(2, "0");
+    return `${hh}:${mm}`;
+  }
+
+  return "";
+}
+
 export default function AllRoundsPage({
   params,
 }: {
@@ -60,7 +75,7 @@ export default function AllRoundsPage({
 
       const dbCode = LEAGUE_DB_CODE[leagueCode];
 
-      // 1) teams
+      // UČITAJ TIMOVE
       const { data: teams } = await supabase
         .from("teams")
         .select("id, name");
@@ -71,35 +86,30 @@ export default function AllRoundsPage({
         teamMap[t.id] = t.name;
       });
 
-      // 2) fixtures za ligu
+      // UČITAJ UTAKMICE
       const { data: fixtures } = await supabase
         .from("fixtures")
         .select("*")
-        .eq("league_code", dbCode);
+        .eq("league_code", dbCode)
+        .order("round")
+        .order("match_date");
 
-      // 3) format
+      // FORMATIRAJ
       const mapped =
         fixtures?.map((f: Fixture) => ({
           id: f.id,
           round: f.round,
           date: new Date(f.match_date).toLocaleDateString("hr-HR"),
-          time: f.match_time ? f.match_time.substring(0, 5) : "",
+          time: formatTime(f.match_time), // 🔥 OVDJE SE RIJEŠAVA PROBLEM
           home: teamMap[f.home_team_id] ?? "Nepoznato",
           away: teamMap[f.away_team_id] ?? "Nepoznato",
         })) ?? [];
 
-      // 4) grupiranje po kolima
+      // GRUPIRAJ PO KOLU
       const grouped: Record<number, any[]> = {};
       mapped.forEach((m) => {
         if (!grouped[m.round]) grouped[m.round] = [];
         grouped[m.round].push(m);
-      });
-
-      // sortiranje po rundi
-      Object.keys(grouped).forEach((r) => {
-        grouped[Number(r)].sort((a, b) =>
-          a.home.localeCompare(b.home)
-        );
       });
 
       setFixturesByRound(grouped);
@@ -115,7 +125,6 @@ export default function AllRoundsPage({
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-8">
-
       <h1 className="text-2xl font-bold text-[#0A5E2A] text-center mb-6">
         Sva kola — {leagueName}
       </h1>
@@ -131,9 +140,7 @@ export default function AllRoundsPage({
               key={round}
               className="bg-[#0A5E2A] text-[#f7f1e6] p-4 rounded-xl shadow space-y-3"
             >
-              <h2 className="text-xl font-semibold">
-                {round}. kolo
-              </h2>
+              <h2 className="text-xl font-semibold">{round}. kolo</h2>
 
               <ul className="space-y-2 text-sm">
                 {matches.map((m) => (
