@@ -1,13 +1,16 @@
 import "./globals.css";
 import Image from "next/image";
-import { LeagueSelector } from "@/components/LeagueSelector";
 
 export const metadata = {
   title: "Liga Panadić 2025/26",
   description: "Zimska liga Panadić 2025/26",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="hr">
       <body className="min-h-screen bg-[#f7f1e6] flex flex-col">
@@ -30,10 +33,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </span>
             </div>
 
-            {/* RIGHT: DROPDOWN */}
-            <div>
-              <LeagueSelector />
-            </div>
+            {/* RIGHT: PRAZNO (dropdown više nije ovdje!) */}
+            <div></div>
           </div>
         </header>
 
