@@ -45,9 +45,11 @@ const LEAGUE_NAME: Record<LeagueCode, string> = {
 export default function AllRoundsPage({
   params,
 }: {
-  params: { leagueCode: LeagueCode };
+  params: { leagueCode: string };
 }) {
-  const { leagueCode } = params;
+
+  const normalized = (params.leagueCode || "").toUpperCase() as LeagueCode;
+  const leagueCode = normalized;
 
   const [fixturesByRound, setFixturesByRound] = useState<
     Record<number, any[]>
@@ -75,31 +77,18 @@ export default function AllRoundsPage({
       const { data: fixtures } = await supabase
         .from("fixtures")
         .select("*")
-        .eq("league_code", dbCode)
-        .order("round")
-        .order("match_date")
-        .order("match_time");
+        .eq("league_code", dbCode);
 
       const mapped =
-        fixtures?.map((f: Fixture) => {
-          let time = "";
+        fixtures?.map((f: Fixture) => ({
+          id: f.id,
+          round: f.round,
+          date: new Date(f.match_date).toLocaleDateString("hr-HR"),
+          time: f.match_time ? f.match_time.substring(0, 5) : "",
+          home: teamMap[f.home_team_id] ?? "Nepoznato",
+          away: teamMap[f.away_team_id] ?? "Nepoznato",
+        })) ?? [];
 
-          if (f.match_time) {
-            const parts = f.match_time.split(":"); // safe
-            time = `${parts[0]}:${parts[1]}`;
-          }
-
-          return {
-            id: f.id,
-            round: f.round,
-            date: new Date(f.match_date).toLocaleDateString("hr-HR"),
-            time,
-            home: teamMap[f.home_team_id] ?? "Nepoznato",
-            away: teamMap[f.away_team_id] ?? "Nepoznato",
-          };
-        }) ?? [];
-
-      // group
       const grouped: Record<number, any[]> = {};
       mapped.forEach((m) => {
         if (!grouped[m.round]) grouped[m.round] = [];
@@ -142,7 +131,7 @@ export default function AllRoundsPage({
                     key={m.id}
                     className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-[#0d6b35] px-3 py-2 rounded-lg"
                   >
-                    <span className="font-medium">
+                    <span>
                       {m.home} — {m.away}
                     </span>
                     <span className="sm:text-right text-[#fcefd5]">
