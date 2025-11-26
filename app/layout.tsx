@@ -1,69 +1,67 @@
 import "./globals.css";
 import Image from "next/image";
-import Link from "next/link";
+import { LeagueSelector } from "@/components/LeagueSelector";
 
 export const metadata = {
   title: "Liga Panadić 2025/26",
-  description: "Malonogometna liga Panadić 2025/26",
+  description: "Zimska liga Panadić 2025/26",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="hr">
-      <body className="min-h-screen bg-[#f7f1e6] flex flex-col text-black">
+      <body className="min-h-screen bg-[#f7f1e6] flex flex-col">
 
         {/* HEADER */}
-        <header className="w-full bg-[#0A5E2A] text-[#f7f1e6] shadow">
-          <div className="max-w-5xl mx-auto flex items-center justify-between px-4 py-3">
-            
-            {/* LEFT TITLE */}
+        <header className="w-full bg-[#0b5b2a] text-[#f7f1e6] shadow">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+
+            {/* LEFT: LOGO + NAZIV */}
             <div className="flex items-center gap-3">
+              <Image
+                src="/logo.png"
+                alt="Liga Panadić logo"
+                width={36}
+                height={36}
+                className="rounded-full"
+              />
               <span className="text-lg sm:text-xl font-semibold">
                 Liga Panadić 2025/26
               </span>
             </div>
 
-            {/* RIGHT (temporary placeholder — dropdown ide u sljedećem koraku) */}
-            <div className="text-sm opacity-80">
-              Odaberi ligu…
+            {/* RIGHT: DROPDOWN */}
+            <div>
+              <LeagueSelector />
             </div>
-
           </div>
         </header>
 
-        {/* MAIN CONTENT */}
-        <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-6">
+        {/* PAGE CONTENT */}
+        <main className="flex-1 w-full">
           {children}
         </main>
 
         {/* FOOTER */}
-        <footer className="w-full bg-[#0A5E2A] text-[#f7f1e6]">
-          <div className="max-w-5xl mx-auto flex items-center justify-between px-4 py-3">
+        <footer className="w-full bg-[#0b5b2a] text-[#f7f1e6]">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
 
-            {/* LEFT LOGO */}
-            <div className="flex items-center gap-2">
-              <Image
-                src="/logo.png"
-                alt="Promar Logo"
-                width={32}
-                height={32}
-              />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="Promar logo"
+              width={28}
+              height={28}
+              className="rounded-full"
+            />
 
-            {/* RIGHT LINK */}
-            <Link
+            <a
               href="https://promar.hr"
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm hover:underline"
             >
               © 2025 Promar.hr
-            </Link>
-
+            </a>
           </div>
         </footer>
 
