@@ -1,3 +1,4 @@
+<a href={`/kola/${leagueCode.toLowerCase()}`}>
 "use client";
 
 import { useEffect, useState } from "react";
