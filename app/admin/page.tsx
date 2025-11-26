@@ -33,7 +33,7 @@ export default function AdminPage() {
   const [awayGoals, setAwayGoals] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0); // ostaje radi reload logike
   const [recalcLoading, setRecalcLoading] = useState(false);
 
   const loadFixtures = async () => {
@@ -127,7 +127,6 @@ export default function AdminPage() {
         });
       }
 
-      // OVDJE više ne radimo automatski recalculation!
       await loadFixtures();
       setRefreshKey((k) => k + 1);
     } finally {
@@ -166,7 +165,6 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {/* 🔥 GUMB ZA AŽURIRANJE TABLICE */}
       <div>
         <button
           onClick={handleRecalculate}
@@ -178,7 +176,8 @@ export default function AdminPage() {
       </div>
 
       <div className="border rounded p-4">
-        <LeagueView leagueCode={leagueCode} refreshKey={refreshKey} />
+        {/* refreshKey se više ne šalje u LeagueView */}
+        <LeagueView leagueCode={leagueCode} />
       </div>
 
       <h2 className="text-xl font-semibold">Sve utakmice</h2>
