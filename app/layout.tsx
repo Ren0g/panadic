@@ -2,8 +2,8 @@ import "./globals.css";
 import Image from "next/image";
 
 export const metadata = {
-  title: "Liga Panadić 2025/26",
-  description: "Zimska liga Panadić 2025/26",
+  title: "Malonogometna liga Panadić 2025/2026",
+  description: "Zimska liga Panadić 2025/2026",
 };
 
 export default function RootLayout({
@@ -17,44 +17,30 @@ export default function RootLayout({
 
         {/* HEADER */}
         <header className="w-full bg-[#0b5b2a] text-[#f7f1e6] shadow">
-          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-
-            {/* LEFT: LOGO + NAZIV */}
-            <div className="flex items-center gap-3">
-              <Image
-                src="/logo.png"
-                alt="Liga Panadić logo"
-                width={36}
-                height={36}
-                className="rounded-full"
-              />
-              <span className="text-lg sm:text-xl font-semibold">
-                Liga Panadić 2025/26
-              </span>
-            </div>
-
-            {/* RIGHT: PRAZNO (dropdown više nije ovdje!) */}
-            <div></div>
+          <div className="w-full text-center py-4">
+            <h1 className="text-xl sm:text-2xl font-semibold">
+              Malonogometna liga Panadić 2025/2026. godina
+            </h1>
           </div>
         </header>
 
-        {/* PAGE CONTENT */}
-        <main className="flex-1 w-full">
-          {children}
+        {/* CONTENT */}
+        <main className="flex-1 w-full flex justify-center">
+          <div className="w-full max-w-3xl px-4 py-6">
+            {children}
+          </div>
         </main>
 
         {/* FOOTER */}
-        <footer className="w-full bg-[#0b5b2a] text-[#f7f1e6]">
-          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-
+        <footer className="w-full bg-[#0b5b2a] text-[#f7f1e6] py-4">
+          <div className="flex items-center justify-center gap-3">
             <Image
               src="/logo.png"
               alt="Promar logo"
-              width={28}
-              height={28}
+              width={26}
+              height={26}
               className="rounded-full"
             />
-
             <a
               href="https://promar.hr"
               target="_blank"
