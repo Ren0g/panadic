@@ -75,19 +75,31 @@ export default function AllRoundsPage({
       const { data: fixtures } = await supabase
         .from("fixtures")
         .select("*")
-        .eq("league_code", dbCode);
+        .eq("league_code", dbCode)
+        .order("round")
+        .order("match_date")
+        .order("match_time");
 
       const mapped =
-        fixtures?.map((f: Fixture) => ({
-          id: f.id,
-          round: f.round,
-          date: new Date(f.match_date).toLocaleDateString("hr-HR"),
-          time: f.match_time ? f.match_time.substring(0, 5) : "",
-          home: teamMap[f.home_team_id] ?? "Nepoznato",
-          away: teamMap[f.away_team_id] ?? "Nepoznato",
-        })) ?? [];
+        fixtures?.map((f: Fixture) => {
+          let time = "";
 
-      // group by round
+          if (f.match_time) {
+            const parts = f.match_time.split(":"); // safe
+            time = `${parts[0]}:${parts[1]}`;
+          }
+
+          return {
+            id: f.id,
+            round: f.round,
+            date: new Date(f.match_date).toLocaleDateString("hr-HR"),
+            time,
+            home: teamMap[f.home_team_id] ?? "Nepoznato",
+            away: teamMap[f.away_team_id] ?? "Nepoznato",
+          };
+        }) ?? [];
+
+      // group
       const grouped: Record<number, any[]> = {};
       mapped.forEach((m) => {
         if (!grouped[m.round]) grouped[m.round] = [];
