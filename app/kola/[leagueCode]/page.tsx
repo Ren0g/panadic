@@ -17,7 +17,7 @@ type Fixture = {
   league_code: string;
   round: number;
   match_date: string;
-  match_time: any; // može biti string ili objekt
+  match_time: string | null;
   home_team_id: string;
   away_team_id: string;
 };
@@ -42,21 +42,6 @@ const LEAGUE_NAME: Record<LeagueCode, string> = {
   POC_SILVER: "Početnici – Srebrna liga",
 };
 
-// 🔥 Formatiranje vremena (radi i za string i za objekt)
-function formatTime(t: any): string {
-  if (!t) return "";
-
-  if (typeof t === "string") return t.substring(0, 5);
-
-  if (typeof t === "object" && t.hours !== undefined) {
-    const hh = String(t.hours).padStart(2, "0");
-    const mm = String(t.minutes).padStart(2, "0");
-    return `${hh}:${mm}`;
-  }
-
-  return "";
-}
-
 export default function AllRoundsPage({
   params,
 }: {
@@ -75,7 +60,7 @@ export default function AllRoundsPage({
 
       const dbCode = LEAGUE_DB_CODE[leagueCode];
 
-      // UČITAJ TIMOVE
+      // teams
       const { data: teams } = await supabase
         .from("teams")
         .select("id, name");
@@ -86,26 +71,23 @@ export default function AllRoundsPage({
         teamMap[t.id] = t.name;
       });
 
-      // UČITAJ UTAKMICE
+      // fixtures
       const { data: fixtures } = await supabase
         .from("fixtures")
         .select("*")
-        .eq("league_code", dbCode)
-        .order("round")
-        .order("match_date");
+        .eq("league_code", dbCode);
 
-      // FORMATIRAJ
       const mapped =
         fixtures?.map((f: Fixture) => ({
           id: f.id,
           round: f.round,
           date: new Date(f.match_date).toLocaleDateString("hr-HR"),
-          time: formatTime(f.match_time), // 🔥 OVDJE SE RIJEŠAVA PROBLEM
+          time: f.match_time ? f.match_time.substring(0, 5) : "",
           home: teamMap[f.home_team_id] ?? "Nepoznato",
           away: teamMap[f.away_team_id] ?? "Nepoznato",
         })) ?? [];
 
-      // GRUPIRAJ PO KOLU
+      // group by round
       const grouped: Record<number, any[]> = {};
       mapped.forEach((m) => {
         if (!grouped[m.round]) grouped[m.round] = [];
