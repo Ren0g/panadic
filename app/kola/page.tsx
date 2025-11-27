@@ -1,9 +1,8 @@
-// app/kola/page.tsx
-export const dynamic = "force-dynamic";
-export const revalidate = false;
-export const fetchCache = "force-no-store";
-export const runtime = "nodejs";
+"use client";
 
+// app/kola/page.tsx
+
+import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import ClientKola from "./client";
 
@@ -17,13 +16,16 @@ const leagueMap: Record<string, string> = {
   POC_SILVER: "POC_SILVER",
 };
 
-export default function Page({ searchParams }: { searchParams: any }) {
-  const raw = searchParams.league;
+export default function Page() {
+  const params = useSearchParams();
+  const raw = params.get("league");
+
   const league =
     typeof raw === "string" ? raw.trim().toUpperCase() : null;
 
   return (
     <div className="p-4">
+      {/* DEBUG BOX */}
       <div className="mb-4 p-3 border border-blue-500 bg-blue-100 text-blue-900 rounded">
         <div><strong>RAW:</strong> {String(raw)}</div>
         <div><strong>NORMALIZED:</strong> {String(league)}</div>
