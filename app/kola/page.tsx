@@ -1,7 +1,8 @@
 // app/kola/page.tsx
 export const dynamic = "force-dynamic";
-export const dynamicParams = true;
-export const revalidate = 0;
+export const revalidate = false;
+export const fetchCache = "force-no-store";
+export const runtime = "nodejs";
 
 import { Suspense } from "react";
 import ClientKola from "./client";
@@ -23,7 +24,6 @@ export default function Page({ searchParams }: { searchParams: any }) {
 
   return (
     <div className="p-4">
-
       <div className="mb-4 p-3 border border-blue-500 bg-blue-100 text-blue-900 rounded">
         <div><strong>RAW:</strong> {String(raw)}</div>
         <div><strong>NORMALIZED:</strong> {String(league)}</div>
