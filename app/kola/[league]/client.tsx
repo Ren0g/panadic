@@ -33,8 +33,9 @@ const LEAGUE_NAME: Record<LeagueCode, string> = {
 };
 
 export default function AllRoundsClient({ leagueCode }: { leagueCode: string }) {
-  const typed = leagueCode as LeagueCode;
-  const dbCode = LEAGUE_DB_CODE[typed];
+  
+  const sanitizedCode = leagueCode.replace(/-/g, "_") as LeagueCode;
+  const dbCode = LEAGUE_DB_CODE[sanitizedCode];
 
   const [fixturesByRound, setFixturesByRound] = useState<Record<number, any[]>>({});
   const [loading, setLoading] = useState(true);
