@@ -19,10 +19,16 @@ export default function Page({ searchParams }: { searchParams: any }) {
   const league =
     typeof raw === "string" ? raw.trim().toUpperCase() : null;
 
-  // 🔥 DEBUG PRIKAZ NA EKRANU
+  // 🔥 DODANO: PRIKAZUJEMO CIJELI URL
+  const fullUrl =
+    typeof window !== "undefined"
+      ? window.location.href
+      : "(server render)";
+
   return (
     <div className="p-4">
-      <div className="mb-4 p-3 border border-red-500 bg-red-100 text-red-900 rounded">
+      <div className="mb-4 p-3 border border-blue-500 bg-blue-100 text-blue-900 rounded">
+        <div><strong>FULL URL:</strong> {fullUrl}</div>
         <div><strong>RAW:</strong> {String(raw)}</div>
         <div><strong>NORMALIZED:</strong> {String(league)}</div>
         <div><strong>VALID KEYS:</strong> {Object.keys(leagueMap).join(", ")}</div>
