@@ -92,7 +92,7 @@ export default function AllRoundsClient({ leagueCode }: { leagueCode: string }) 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-8">
       <h1 className="text-2xl font-bold text-[#0A5E2A] text-center mb-6">
-        Sva kola — {LEAGUE_NAME[typed]}
+        Sva kola — {LEAGUE_NAME[sanitizedCode]}
       </h1>
 
       {Object.keys(fixturesByRound)
