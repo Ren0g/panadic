@@ -1,4 +1,6 @@
 // app/kola/page.tsx
+export const dynamic = "force-dynamic";
+
 import { Suspense } from "react";
 import ClientKola from "./client";
 
@@ -16,11 +18,6 @@ export default function Page({ searchParams }: { searchParams: any }) {
   const raw = searchParams.league;
   const league =
     typeof raw === "string" ? raw.trim().toUpperCase() : null;
-
-  // 🔥 DIJAGNOSTIKA
-  console.log("RAW LEAGUE PARAM:", raw);
-  console.log("NORMALIZED LEAGUE:", league);
-  console.log("VALID MAP KEYS:", Object.keys(leagueMap));
 
   if (!league || !leagueMap[league]) {
     return (
