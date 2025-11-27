@@ -12,6 +12,16 @@ type LeagueCode =
   | "POC_GOLD"
   | "POC_SILVER";
 
+type Fixture = {
+  id: string;
+  league_code: string;
+  round: number;
+  match_date: string;
+  match_time: string | null;
+  home_team_id: string;
+  away_team_id: string;
+};
+
 const LEAGUE_DB_CODE: Record<LeagueCode, string> = {
   PIONIRI: "PIONIRI_REG",
   MLADJI: "MLPIONIRI_REG",
@@ -32,39 +42,72 @@ const LEAGUE_NAME: Record<LeagueCode, string> = {
   POC_SILVER: "Početnici – Srebrna liga",
 };
 
-export default function AllRoundsClient({ leagueCode }: { leagueCode: string }) {
-  const safeCode = (leagueCode?.toUpperCase() as LeagueCode) ?? "PIONIRI";
-  const dbCode = LEAGUE_DB_CODE[safeCode];
+export default function AllRoundsClient({
+  leagueCode,
+}: {
+  leagueCode: string;
+}) {
+  const upper = leagueCode.toUpperCase() as LeagueCode;
 
-  const [fixturesByRound, setFixturesByRound] = useState<Record<number, any[]>>({});
+  const [fixturesByRound, setFixturesByRound] = useState<
+    Record<number, any[]>
+  >({});
   const [loading, setLoading] = useState(true);
+  const [errorText, setErrorText] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
+      const dbCode = LEAGUE_DB_CODE[upper];
+
+      if (!dbCode) {
+        setErrorText("Nepoznata liga.");
+        setFixturesByRound({});
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
+      setErrorText(null);
 
-      // teams
-      const { data: teams } = await supabase.from("teams").select("id, name");
+      // 1) Teams
+      const { data: teams, error: teamsError } = await supabase
+        .from("teams")
+        .select("id, name");
+
+      if (teamsError) {
+        setErrorText("Greška kod čitanja timova.");
+        setLoading(false);
+        return;
+      }
+
       const teamMap: Record<string, string> = {};
-      teams?.forEach((t) => (teamMap[t.id] = t.name));
+      teams?.forEach((t) => {
+        // @ts-ignore
+        teamMap[t.id] = t.name;
+      });
 
-      // fixtures
-      const { data: fixtures } = await supabase
+      // 2) Fixtures
+      const { data: fixtures, error: fixturesError } = await supabase
         .from("fixtures")
         .select("*")
         .eq("league_code", dbCode);
 
+      if (fixturesError) {
+        setErrorText("Greška kod čitanja kola.");
+        setLoading(false);
+        return;
+      }
+
       const mapped =
-        fixtures?.map((f: any) => ({
+        fixtures?.map((f: Fixture) => ({
           id: f.id,
           round: f.round,
           date: new Date(f.match_date).toLocaleDateString("hr-HR"),
           time: f.match_time ? f.match_time.substring(0, 5) : "",
-          home: teamMap[f.home_team_id],
-          away: teamMap[f.away_team_id],
+          home: teamMap[f.home_team_id] ?? "Nepoznato",
+          away: teamMap[f.away_team_id] ?? "Nepoznato",
         })) ?? [];
 
-      // group
       const grouped: Record<number, any[]> = {};
       mapped.forEach((m) => {
         if (!grouped[m.round]) grouped[m.round] = [];
@@ -76,14 +119,30 @@ export default function AllRoundsClient({ leagueCode }: { leagueCode: string }) 
     };
 
     load();
-  }, [leagueCode]);
+  }, [upper]);
 
-  if (loading) return <p>Učitavanje...</p>;
+  if (loading) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-6">
+        <p>Učitavanje...</p>
+      </div>
+    );
+  }
+
+  if (errorText) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-6">
+        <p className="text-red-700">{errorText}</p>
+      </div>
+    );
+  }
+
+  const leagueName = LEAGUE_NAME[upper];
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-8">
       <h1 className="text-2xl font-bold text-[#0A5E2A] text-center mb-6">
-        Sva kola — {LEAGUE_NAME[safeCode]}
+        Sva kola — {leagueName}
       </h1>
 
       {Object.keys(fixturesByRound)
@@ -93,7 +152,10 @@ export default function AllRoundsClient({ leagueCode }: { leagueCode: string }) 
           const matches = fixturesByRound[round];
 
           return (
-            <div key={round} className="bg-[#0A5E2A] text-[#f7f1e6] p-4 rounded-xl shadow space-y-3">
+            <div
+              key={round}
+              className="bg-[#0A5E2A] text-[#f7f1e6] p-4 rounded-xl shadow space-y-3"
+            >
               <h2 className="text-xl font-semibold">{round}. kolo</h2>
 
               <ul className="space-y-2 text-sm">
@@ -105,7 +167,6 @@ export default function AllRoundsClient({ leagueCode }: { leagueCode: string }) 
                     <span className="font-medium">
                       {m.home} — {m.away}
                     </span>
-
                     <span className="sm:text-right text-[#fcefd5]">
                       {m.date} {m.time && `u ${m.time}`}
                     </span>
