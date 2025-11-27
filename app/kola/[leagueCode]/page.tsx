@@ -12,16 +12,6 @@ type LeagueCode =
   | "POC_GOLD"
   | "POC_SILVER";
 
-type Fixture = {
-  id: string;
-  league_code: string;
-  round: number;
-  match_date: string;
-  match_time: string | null;
-  home_team_id: string;
-  away_team_id: string;
-};
-
 const LEAGUE_DB_CODE: Record<LeagueCode, string> = {
   PIONIRI: "PIONIRI_REG",
   MLADJI: "MLPIONIRI_REG",
@@ -45,50 +35,46 @@ const LEAGUE_NAME: Record<LeagueCode, string> = {
 export default function AllRoundsPage({
   params,
 }: {
-  params: { leagueCode: string };
+  params: { leagueCode: LeagueCode };
 }) {
-
-  const normalized = (params.leagueCode || "").toUpperCase() as LeagueCode;
-  const leagueCode = normalized;
+  const leagueCode = params.leagueCode;
+  const dbCode = LEAGUE_DB_CODE[leagueCode];
 
   const [fixturesByRound, setFixturesByRound] = useState<
     Record<number, any[]>
   >({});
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
 
-      const dbCode = LEAGUE_DB_CODE[leagueCode];
-
-      // teams
+      // Load teams
       const { data: teams } = await supabase
         .from("teams")
         .select("id, name");
 
       const teamMap: Record<string, string> = {};
-      teams?.forEach((t) => {
-        // @ts-ignore
-        teamMap[t.id] = t.name;
-      });
+      teams?.forEach((t) => (teamMap[t.id] = t.name));
 
-      // fixtures
+      // Load fixtures
       const { data: fixtures } = await supabase
         .from("fixtures")
         .select("*")
-        .eq("league_code", dbCode);
+        .eq("league_code", dbCode); // ✔️ PRAVILNO MAPIRANJE
 
       const mapped =
-        fixtures?.map((f: Fixture) => ({
+        fixtures?.map((f: any) => ({
           id: f.id,
           round: f.round,
           date: new Date(f.match_date).toLocaleDateString("hr-HR"),
           time: f.match_time ? f.match_time.substring(0, 5) : "",
-          home: teamMap[f.home_team_id] ?? "Nepoznato",
-          away: teamMap[f.away_team_id] ?? "Nepoznato",
+          home: teamMap[f.home_team_id],
+          away: teamMap[f.away_team_id],
         })) ?? [];
 
+      // Group by rounds
       const grouped: Record<number, any[]> = {};
       mapped.forEach((m) => {
         if (!grouped[m.round]) grouped[m.round] = [];
@@ -102,14 +88,12 @@ export default function AllRoundsPage({
     load();
   }, [leagueCode]);
 
-  if (loading) return <p className="text-black">Učitavanje...</p>;
-
-  const leagueName = LEAGUE_NAME[leagueCode];
+  if (loading) return <p>Učitavanje...</p>;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-8">
       <h1 className="text-2xl font-bold text-[#0A5E2A] text-center mb-6">
-        Sva kola — {leagueName}
+        Sva kola — {LEAGUE_NAME[leagueCode]}
       </h1>
 
       {Object.keys(fixturesByRound)
@@ -131,9 +115,10 @@ export default function AllRoundsPage({
                     key={m.id}
                     className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-[#0d6b35] px-3 py-2 rounded-lg"
                   >
-                    <span>
+                    <span className="font-medium">
                       {m.home} — {m.away}
                     </span>
+
                     <span className="sm:text-right text-[#fcefd5]">
                       {m.date} {m.time && `u ${m.time}`}
                     </span>
