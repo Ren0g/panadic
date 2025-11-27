@@ -13,7 +13,10 @@ const leagueMap: Record<string, string> = {
 };
 
 export default function Page({ searchParams }: { searchParams: any }) {
-  const league = searchParams.league;
+  const league =
+    typeof searchParams.league === "string"
+      ? searchParams.league.trim().toUpperCase()
+      : null;
 
   if (!league || !leagueMap[league]) {
     return (
