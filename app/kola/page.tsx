@@ -13,10 +13,14 @@ const leagueMap: Record<string, string> = {
 };
 
 export default function Page({ searchParams }: { searchParams: any }) {
+  const raw = searchParams.league;
   const league =
-    typeof searchParams.league === "string"
-      ? searchParams.league.trim().toUpperCase()
-      : null;
+    typeof raw === "string" ? raw.trim().toUpperCase() : null;
+
+  // 🔥 DIJAGNOSTIKA
+  console.log("RAW LEAGUE PARAM:", raw);
+  console.log("NORMALIZED LEAGUE:", league);
+  console.log("VALID MAP KEYS:", Object.keys(leagueMap));
 
   if (!league || !leagueMap[league]) {
     return (
