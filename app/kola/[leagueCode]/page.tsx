@@ -37,7 +37,15 @@ export default function AllRoundsPage({
 }: {
   params: { leagueCode: LeagueCode };
 }) {
+
+  /* 🔥 DEBUG 1 — vidi cijeli objekt params */
+  console.log("PARAMS =", params);
+
   const leagueCode = params.leagueCode;
+
+  /* 🔥 DEBUG 2 — vidi koji kod rute stvarno dobivamo */
+  console.log("leagueCode =", leagueCode);
+
   const dbCode = LEAGUE_DB_CODE[leagueCode];
 
   const [fixturesByRound, setFixturesByRound] = useState<
