@@ -12,16 +12,6 @@ type LeagueCode =
   | "POC_GOLD"
   | "POC_SILVER";
 
-type Fixture = {
-  id: string;
-  league_code: string;
-  round: number;
-  match_date: string;
-  match_time: string | null;
-  home_team_id: string;
-  away_team_id: string;
-};
-
 const LEAGUE_DB_CODE: Record<LeagueCode, string> = {
   PIONIRI: "PIONIRI_REG",
   MLADJI: "MLPIONIRI_REG",
@@ -42,70 +32,45 @@ const LEAGUE_NAME: Record<LeagueCode, string> = {
   POC_SILVER: "Početnici – Srebrna liga",
 };
 
-export default function AllRoundsClient({
-  leagueCode,
-}: {
-  leagueCode: string;
-}) {
-  const upper = leagueCode.toUpperCase() as LeagueCode;
+export default function AllRoundsClient({ leagueCode }: { leagueCode: string }) {
+  const typed = leagueCode as LeagueCode;
+  const dbCode = LEAGUE_DB_CODE[typed];
 
-  const [fixturesByRound, setFixturesByRound] = useState<
-    Record<number, any[]>
-  >({});
+  const [fixturesByRound, setFixturesByRound] = useState<Record<number, any[]>>({});
   const [loading, setLoading] = useState(true);
-  const [errorText, setErrorText] = useState<string | null>(null);
+
+  if (!dbCode) {
+    return (
+      <div className="text-red-600 text-center text-xl py-20">
+        Nepoznata liga.
+      </div>
+    );
+  }
 
   useEffect(() => {
     const load = async () => {
-      const dbCode = LEAGUE_DB_CODE[upper];
-
-      if (!dbCode) {
-        setErrorText("Nepoznata liga.");
-        setFixturesByRound({});
-        setLoading(false);
-        return;
-      }
-
       setLoading(true);
-      setErrorText(null);
 
-      // 1) Teams
-      const { data: teams, error: teamsError } = await supabase
-        .from("teams")
-        .select("id, name");
-
-      if (teamsError) {
-        setErrorText("Greška kod čitanja timova.");
-        setLoading(false);
-        return;
-      }
+      // Load teams
+      const { data: teams } = await supabase.from("teams").select("id, name");
 
       const teamMap: Record<string, string> = {};
-      teams?.forEach((t) => {
-        // @ts-ignore
-        teamMap[t.id] = t.name;
-      });
+      teams?.forEach((t) => (teamMap[t.id] = t.name));
 
-      // 2) Fixtures
-      const { data: fixtures, error: fixturesError } = await supabase
+      // Load fixtures
+      const { data: fixtures } = await supabase
         .from("fixtures")
         .select("*")
         .eq("league_code", dbCode);
 
-      if (fixturesError) {
-        setErrorText("Greška kod čitanja kola.");
-        setLoading(false);
-        return;
-      }
-
       const mapped =
-        fixtures?.map((f: Fixture) => ({
+        fixtures?.map((f: any) => ({
           id: f.id,
           round: f.round,
           date: new Date(f.match_date).toLocaleDateString("hr-HR"),
           time: f.match_time ? f.match_time.substring(0, 5) : "",
-          home: teamMap[f.home_team_id] ?? "Nepoznato",
-          away: teamMap[f.away_team_id] ?? "Nepoznato",
+          home: teamMap[f.home_team_id],
+          away: teamMap[f.away_team_id],
         })) ?? [];
 
       const grouped: Record<number, any[]> = {};
@@ -119,30 +84,14 @@ export default function AllRoundsClient({
     };
 
     load();
-  }, [upper]);
+  }, [dbCode]);
 
-  if (loading) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 py-6">
-        <p>Učitavanje...</p>
-      </div>
-    );
-  }
-
-  if (errorText) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 py-6">
-        <p className="text-red-700">{errorText}</p>
-      </div>
-    );
-  }
-
-  const leagueName = LEAGUE_NAME[upper];
+  if (loading) return <p className="text-center py-20">Učitavanje...</p>;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-8">
       <h1 className="text-2xl font-bold text-[#0A5E2A] text-center mb-6">
-        Sva kola — {leagueName}
+        Sva kola — {LEAGUE_NAME[typed]}
       </h1>
 
       {Object.keys(fixturesByRound)
@@ -167,6 +116,7 @@ export default function AllRoundsClient({
                     <span className="font-medium">
                       {m.home} — {m.away}
                     </span>
+
                     <span className="sm:text-right text-[#fcefd5]">
                       {m.date} {m.time && `u ${m.time}`}
                     </span>
