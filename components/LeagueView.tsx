@@ -253,7 +253,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
 
         <div className="mt-4 text-center">
           <a
-            href={`/kola/${leagueCode.toLowerCase()}`}
+            href={`/kola?league=${leagueCode}`}
             className="text-sm underline hover:no-underline"
           >
             Pogledaj sva kola →
