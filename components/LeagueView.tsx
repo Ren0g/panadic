@@ -12,6 +12,26 @@ type LeagueCode =
   | "POC_GOLD"
   | "POC_SILVER";
 
+const LEAGUE_DB_CODE: Record<LeagueCode, string> = {
+  PIONIRI: "PIONIRI_REG",
+  MLADJI: "MLPIONIRI_REG",
+  PRSTICI: "PRSTICI_REG",
+  POC_A: "POC_REG_A",
+  POC_B: "POC_REG_B",
+  POC_GOLD: "POC_GOLD",
+  POC_SILVER: "POC_SILVER",
+};
+
+const LEAGUE_NAME: Record<LeagueCode, string> = {
+  PIONIRI: "Pioniri",
+  MLADJI: "Mlađi pioniri",
+  PRSTICI: "Prstići",
+  POC_A: "Početnici A",
+  POC_B: "Početnici B",
+  POC_GOLD: "Početnici – Zlatna liga",
+  POC_SILVER: "Početnici – Srebrna liga",
+};
+
 type Standing = {
   league_code: string;
   team_id: string;
@@ -33,26 +53,6 @@ type Fixture = {
   match_time: string | null;
   home_team_id: string;
   away_team_id: string;
-};
-
-const LEAGUE_DB_CODE: Record<LeagueCode, string> = {
-  PIONIRI: "PIONIRI_REG",
-  MLADJI: "MLPIONIRI_REG",
-  PRSTICI: "PRSTICI_REG",
-  POC_A: "POC_REG_A",
-  POC_B: "POC_REG_B",
-  POC_GOLD: "POC_GOLD",
-  POC_SILVER: "POC_SILVER",
-};
-
-const LEAGUE_NAME: Record<LeagueCode, string> = {
-  PIONIRI: "Pioniri",
-  MLADJI: "Mlađi pioniri",
-  PRSTICI: "Prstići",
-  POC_A: "Početnici A",
-  POC_B: "Početnici B",
-  POC_GOLD: "Početnici – Zlatna liga",
-  POC_SILVER: "Početnici – Srebrna liga",
 };
 
 type NextRoundMatch = {
@@ -80,9 +80,15 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
       const dbLeagueCode = LEAGUE_DB_CODE[leagueCode];
 
       // TEAMS
-      const { data: teams } = await supabase.from("teams").select("id, name");
+      const { data: teams } = await supabase
+        .from("teams")
+        .select("id, name");
+
       const teamMap: Record<string, string> = {};
-      teams?.forEach((t) => (teamMap[t.id] = t.name));
+      teams?.forEach((t) => {
+        // @ts-ignore
+        teamMap[t.id] = t.name;
+      });
 
       // STANDINGS
       const { data: rawStandings } = await supabase
@@ -109,7 +115,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
       const now = new Date();
 
       const fixtures =
-        rawFixtures?.map((f: Fixture) => {
+        (rawFixtures as Fixture[] | null)?.map((f) => {
           const fullDateTime = new Date(
             `${f.match_date}T${f.match_time || "00:00"}`
           );
@@ -118,12 +124,15 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
             ...f,
             fullDateTime,
             dateFormatted: new Date(f.match_date).toLocaleDateString("hr-HR"),
-            timeFormatted: f.match_time ? f.match_time.substring(0, 5) : "",
+            timeFormatted: f.match_time
+              ? f.match_time.substring(0, 5)
+              : "",
             home_team_name: teamMap[f.home_team_id] ?? "Nepoznato",
             away_team_name: teamMap[f.away_team_id] ?? "Nepoznato",
           };
         }) ?? [];
 
+      // Future fixtures
       const futureFixtures = fixtures.filter(
         (f) => f.fullDateTime > now
       );
@@ -135,11 +144,16 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         return;
       }
 
-      const nextRound = Math.min(...futureFixtures.map((f) => f.round));
+      const nextRound = futureFixtures.reduce(
+        (min, f) => (f.round < min ? f.round : min),
+        futureFixtures[0].round
+      );
 
       const nextRoundList = futureFixtures
         .filter((f) => f.round === nextRound)
-        .sort((a, b) => a.fullDateTime.getTime() - b.fullDateTime.getTime())
+        .sort(
+          (a, b) => a.fullDateTime.getTime() - b.fullDateTime.getTime()
+        )
         .map((f) => ({
           id: f.id,
           round: f.round,
@@ -151,14 +165,15 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
 
       setNextRoundNumber(nextRound);
       setNextRoundMatches(nextRoundList);
-
       setLoading(false);
     };
 
     loadData();
   }, [leagueCode]);
 
-  if (loading) return <p className="text-black">Učitavanje...</p>;
+  if (loading) {
+    return <p className="text-black">Učitavanje...</p>;
+  }
 
   const leagueName = LEAGUE_NAME[leagueCode];
 
@@ -172,32 +187,32 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         <table className="w-full text-sm">
           <thead className="border-b border-[#c8b59a] text-[#0A5E2A]">
             <tr>
-              <th>#</th>
-              <th>Klub</th>
-              <th>UT</th>
-              <th>P</th>
-              <th>N</th>
-              <th>I</th>
-              <th>G+</th>
-              <th>G-</th>
-              <th>GR</th>
-              <th>Bod</th>
+              <th className="py-2 w-6 text-left">#</th>
+              <th className="py-2 text-left">Klub</th>
+              <th className="py-2 w-10 text-center">UT</th>
+              <th className="py-2 w-10 text-center">P</th>
+              <th className="py-2 w-10 text-center">N</th>
+              <th className="py-2 w-10 text-center">I</th>
+              <th className="py-2 w-10 text-center">G+</th>
+              <th className="py-2 w-10 text-center">G-</th>
+              <th className="py-2 w-12 text-center">GR</th>
+              <th className="py-2 w-12 text-center">Bod</th>
             </tr>
           </thead>
 
           <tbody>
             {standings.map((s, i) => (
-              <tr key={s.team_id} className="border-b bg-white">
-                <td>{i + 1}</td>
-                <td>{s.team_name}</td>
-                <td className="text-center">{s.ut}</td>
-                <td className="text-center">{s.p}</td>
-                <td className="text-center">{s.n}</td>
-                <td className="text-center">{s.i}</td>
-                <td className="text-center">{s.gplus}</td>
-                <td className="text-center">{s.gminus}</td>
-                <td className="text-center">{s.gr}</td>
-                <td className="text-center font-bold text-[#0A5E2A]">
+              <tr key={s.team_id} className="border-b border-[#e3d4bf] bg-white">
+                <td className="py-2 px-1">{i + 1}</td>
+                <td className="py-2">{s.team_name}</td>
+                <td className="py-2 text-center">{s.ut}</td>
+                <td className="py-2 text-center">{s.p}</td>
+                <td className="py-2 text-center">{s.n}</td>
+                <td className="py-2 text-center">{s.i}</td>
+                <td className="py-2 text-center">{s.gplus}</td>
+                <td className="py-2 text-center">{s.gminus}</td>
+                <td className="py-2 text-center">{s.gr}</td>
+                <td className="py-2 text-center font-bold text-[#0A5E2A]">
                   {s.bodovi}
                 </td>
               </tr>
@@ -216,13 +231,21 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         </h2>
 
         {nextRoundMatches.length === 0 ? (
-          <p>Nema nadolazećih kola.</p>
+          <p className="text-sm">Nema nadolazećih kola.</p>
         ) : (
-          <ul className="space-y-2 text-sm">
+          <ul className="space-y-3 text-sm">
             {nextRoundMatches.map((m) => (
-              <li key={m.id} className="flex justify-between bg-[#0d6b35] px-3 py-2 rounded-lg">
-                <span>{m.home_team_name} — {m.away_team_name}</span>
-                <span className="text-[#fcefd5]">{m.date} {m.time && `u ${m.time}`}</span>
+              <li
+                key={m.id}
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-[#0d6b35] px-3 py-2 rounded-lg"
+              >
+                <span className="font-medium">
+                  {m.home_team_name} — {m.away_team_name}
+                </span>
+
+                <span className="sm:text-right text-[#fcefd5]">
+                  {m.date} {m.time && `u ${m.time}`}
+                </span>
               </li>
             ))}
           </ul>
@@ -236,6 +259,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
             Pogledaj sva kola →
           </a>
         </div>
+
       </div>
     </div>
   );
