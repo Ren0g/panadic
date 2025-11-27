@@ -1,5 +1,7 @@
 import AllRoundsClient from "./client";
 
 export default function AllRoundsPage({ params }: { params: { leagueCode: string } }) {
-  return <AllRoundsClient leagueCode={params.leagueCode} />;
+  const code = params?.leagueCode?.toUpperCase() as string;
+
+  return <AllRoundsClient leagueCode={code} />;
 }
