@@ -19,30 +19,26 @@ export default function Page({ searchParams }: { searchParams: any }) {
   const league =
     typeof raw === "string" ? raw.trim().toUpperCase() : null;
 
-  if (!league || !leagueMap[league]) {
-    return (
-      <div className="p-6 text-center">
-        <h1 className="text-xl font-bold text-red-600">
-          Liga nije pronađena.
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Provjerite URL ili odaberite ligu iz početnog izbornika.
-        </p>
-      </div>
-    );
-  }
-
-  const dbLeagueCode = leagueMap[league];
-
+  // 🔥 DEBUG PRIKAZ NA EKRANU
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold text-[#0b5b2a] mb-4">
-        Sva kola – {league}
-      </h1>
+      <div className="mb-4 p-3 border border-red-500 bg-red-100 text-red-900 rounded">
+        <div><strong>RAW:</strong> {String(raw)}</div>
+        <div><strong>NORMALIZED:</strong> {String(league)}</div>
+        <div><strong>VALID KEYS:</strong> {Object.keys(leagueMap).join(", ")}</div>
+      </div>
 
-      <Suspense fallback={<div>Učitavanje kola…</div>}>
-        <ClientKola leagueCode={dbLeagueCode} />
-      </Suspense>
+      {!league || !leagueMap[league] ? (
+        <div className="p-6 text-center">
+          <h1 className="text-xl font-bold text-red-600">
+            Liga nije pronađena.
+          </h1>
+        </div>
+      ) : (
+        <Suspense fallback={<div>Učitavanje kola…</div>}>
+          <ClientKola leagueCode={leagueMap[league]} />
+        </Suspense>
+      )}
     </div>
   );
 }
