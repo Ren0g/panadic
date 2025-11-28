@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
+type ResultType = {
+  home_goals: number | null;
+  away_goals: number | null;
+};
+
 export default function LiveMatch({ params }: { params: { id: string } }) {
   const fixtureId = Number(params.id);
   const router = useRouter();
@@ -11,7 +16,6 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
   const [match, setMatch] = useState<any>(null);
   const [homeGoals, setHomeGoals] = useState(0);
   const [awayGoals, setAwayGoals] = useState(0);
-
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,15 +46,19 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
       return;
     }
 
-    // FIX: home/away su array → pretvoriti u pojedinačan objekt
+    // FIX: relacije su array → uzmi prvi element
     const homeRel = Array.isArray(data.home) ? data.home[0] : data.home;
     const awayRel = Array.isArray(data.away) ? data.away[0] : data.away;
 
-    const result = data.results?.[0] || {};
+    // FIX: osiguraj type ResultType
+    const result: ResultType = data.results?.[0] || {
+      home_goals: 0,
+      away_goals: 0,
+    };
 
     setMatch({
       home_team: homeRel?.name ?? "",
-      away_team: awayRel?.name ?? ""
+      away_team: awayRel?.name ?? "",
     });
 
     setHomeGoals(result.home_goals ?? 0);
@@ -93,22 +101,23 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
           <span>{match.away_team}</span>
         </div>
 
+        {/* GRID ZA + / - GUMBE */}
         <div className="grid grid-cols-3 gap-4 items-center text-center">
 
           {/* HOME - */}
           <button
-            onClick={() => setHomeGoals((x) => Math.max(0, x - 1))}
+            onClick={() => setHomeGoals((v) => Math.max(0, v - 1))}
             className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
           >
             –
           </button>
 
-          {/* RESULT */}
+          {/* REZULTAT */}
           <div className="text-4xl font-bold">{homeGoals}:{awayGoals}</div>
 
           {/* HOME + */}
           <button
-            onClick={() => setHomeGoals((x) => x + 1)}
+            onClick={() => setHomeGoals((v) => v + 1)}
             className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
           >
             +
@@ -116,7 +125,7 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
 
           {/* AWAY - */}
           <button
-            onClick={() => setAwayGoals((x) => Math.max(0, x - 1))}
+            onClick={() => setAwayGoals((v) => Math.max(0, v - 1))}
             className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
           >
             –
@@ -126,7 +135,7 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
 
           {/* AWAY + */}
           <button
-            onClick={() => setAwayGoals((x) => x + 1)}
+            onClick={() => setAwayGoals((v) => v + 1)}
             className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
           >
             +
