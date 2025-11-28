@@ -32,44 +32,9 @@ const LEAGUE_NAME: Record<LeagueCode, string> = {
   POC_SILVER: "Početnici – Srebrna liga",
 };
 
-type Standing = {
-  league_code: string;
-  team_id: string;
-  ut: number;
-  p: number;
-  n: number;
-  i: number;
-  gplus: number;
-  gminus: number;
-  gr: number;
-  bodovi: number;
-};
-
-type Fixture = {
-  id: string;
-  league_code: string;
-  round: number;
-  match_date: string;
-  match_time: string | null;
-  home_team_id: string;
-  away_team_id: string;
-};
-
-type NextRoundMatch = {
-  id: string;
-  round: number;
-  date: string;
-  time: string;
-  home_team_name: string;
-  away_team_name: string;
-};
-
 export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
-  const [standings, setStandings] = useState<
-    (Standing & { team_name: string })[]
-  >([]);
-
-  const [nextRoundMatches, setNextRoundMatches] = useState<NextRoundMatch[]>([]);
+  const [standings, setStandings] = useState<any[]>([]);
+  const [nextRoundMatches, setNextRoundMatches] = useState<any[]>([]);
   const [nextRoundNumber, setNextRoundNumber] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -79,18 +44,13 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
 
       const dbLeagueCode = LEAGUE_DB_CODE[leagueCode];
 
-      // TEAMS
       const { data: teams } = await supabase
         .from("teams")
         .select("id, name");
 
       const teamMap: Record<string, string> = {};
-      teams?.forEach((t) => {
-        // @ts-ignore
-        teamMap[t.id] = t.name;
-      });
+      teams?.forEach((t) => (teamMap[t.id] = t.name));
 
-      // STANDINGS
       const { data: rawStandings } = await supabase
         .from("standings")
         .select("*")
@@ -98,15 +58,13 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         .order("bodovi", { ascending: false })
         .order("gr", { ascending: false });
 
-      const finalStandings =
-        (rawStandings as Standing[] | null)?.map((s) => ({
-          ...s,
-          team_name: teamMap[s.team_id] ?? "Nepoznato",
-        })) ?? [];
+      const final = (rawStandings || []).map((s) => ({
+        ...s,
+        team_name: teamMap[s.team_id] ?? "Nepoznato",
+      }));
 
-      setStandings(finalStandings);
+      setStandings(final);
 
-      // FIXTURES
       const { data: rawFixtures } = await supabase
         .from("fixtures")
         .select("*")
@@ -114,74 +72,50 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
 
       const now = new Date();
 
-      const fixtures =
-        (rawFixtures as Fixture[] | null)?.map((f) => {
-          const fullDateTime = new Date(
-            `${f.match_date}T${f.match_time || "00:00"}`
-          );
+      const fixtures = (rawFixtures || []).map((f: any) => {
+        const fullDate = new Date(`${f.match_date}T${f.match_time}`);
 
-          return {
-            ...f,
-            fullDateTime,
-            dateFormatted: new Date(f.match_date).toLocaleDateString("hr-HR"),
-            timeFormatted: f.match_time
-              ? f.match_time.substring(0, 5)
-              : "",
-            home_team_name: teamMap[f.home_team_id] ?? "Nepoznato",
-            away_team_name: teamMap[f.away_team_id] ?? "Nepoznato",
-          };
-        }) ?? [];
+        return {
+          ...f,
+          fullDateTime: fullDate,
+          dateFormatted: new Date(f.match_date).toLocaleDateString("hr-HR"),
+          timeFormatted: f.match_time.substring(0, 5),
+          home_team_name: teamMap[f.home_team_id] ?? "Nepoznato",
+          away_team_name: teamMap[f.away_team_id] ?? "Nepoznato",
+        };
+      });
 
-      // Future fixtures
-      const futureFixtures = fixtures.filter(
-        (f) => f.fullDateTime > now
-      );
+      const future = fixtures.filter((f: any) => f.fullDateTime > now);
 
-      if (futureFixtures.length === 0) {
+      if (future.length === 0) {
         setNextRoundMatches([]);
         setNextRoundNumber(null);
         setLoading(false);
         return;
       }
 
-      const nextRound = futureFixtures.reduce(
-        (min, f) => (f.round < min ? f.round : min),
-        futureFixtures[0].round
-      );
+      const nextRound = Math.min(...future.map((f: any) => f.round));
 
-      const nextRoundList = futureFixtures
-        .filter((f) => f.round === nextRound)
-        .sort(
-          (a, b) => a.fullDateTime.getTime() - b.fullDateTime.getTime()
-        )
-        .map((f) => ({
-          id: f.id,
-          round: f.round,
-          date: f.dateFormatted,
-          time: f.timeFormatted,
-          home_team_name: f.home_team_name,
-          away_team_name: f.away_team_name,
-        }));
+      const matches = future
+        .filter((f: any) => f.round === nextRound)
+        .sort((a: any, b: any) => a.fullDateTime - b.fullDateTime);
 
       setNextRoundNumber(nextRound);
-      setNextRoundMatches(nextRoundList);
+      setNextRoundMatches(matches);
       setLoading(false);
     };
 
     loadData();
   }, [leagueCode]);
 
-  if (loading) {
-    return <p className="text-black">Učitavanje...</p>;
-  }
+  if (loading) return <p className="text-black">Učitavanje...</p>;
 
   const leagueName = LEAGUE_NAME[leagueCode];
 
   return (
     <div className="space-y-6">
-
       {/* TABLICA */}
-      <div className="bg-[#f3ebd8] p-4 rounded-xl shadow border border-[#c8b59a] text-[#1a1a1a]">
+      <div className="bg-[#f3ebd8] p-4 rounded-xl shadow border border-[#c8b59a]">
         <h1 className="text-xl font-bold mb-4 text-[#0A5E2A]">{leagueName}</h1>
 
         <table className="w-full text-sm">
@@ -223,7 +157,6 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
 
       {/* SLJEDEĆE KOLO */}
       <div className="bg-[#0A5E2A] text-[#f7f1e6] p-4 rounded-xl shadow">
-
         <h2 className="text-lg font-semibold mb-4">
           {nextRoundNumber
             ? `Sljedeće kolo — ${nextRoundNumber}. kolo`
@@ -234,7 +167,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
           <p className="text-sm">Nema nadolazećih kola.</p>
         ) : (
           <ul className="space-y-3 text-sm">
-            {nextRoundMatches.map((m) => (
+            {nextRoundMatches.map((m: any) => (
               <li
                 key={m.id}
                 className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-[#0d6b35] px-3 py-2 rounded-lg"
@@ -244,7 +177,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
                 </span>
 
                 <span className="sm:text-right text-[#fcefd5]">
-                  {m.date} {m.time && `u ${m.time}`}
+                  {m.dateFormatted} u {m.timeFormatted}
                 </span>
               </li>
             ))}
@@ -252,14 +185,15 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         )}
 
         <div className="mt-4 text-center">
-          <a
-            href={`/kola?league=${leagueCode}`}
-            className="text-sm underline hover:no-underline"
+          <button
+            onClick={() =>
+              (window.location.href = `/kola?league=${leagueCode}`)
+            }
+            className="px-4 py-2 bg-white text-[#0A5E2A] font-semibold rounded-full border border-[#e3d4bf] shadow hover:bg-[#f7f1e6]"
           >
             Pogledaj sva kola →
-          </a>
+          </button>
         </div>
-
       </div>
     </div>
   );
