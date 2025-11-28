@@ -88,16 +88,11 @@ export async function POST(req: Request) {
       );
     }
 
-    const realTeams = (teams as TeamRow[] | null)?.filter(
-      (t) => !t.is_placeholder
-    ) ?? [];
+    const realTeams =
+      (teams as TeamRow[] | null)?.filter((t) => !t.is_placeholder) ?? [];
 
     if (realTeams.length === 0) {
-      // Nema pravih timova → samo obriši standings za ligu
-      await supabase
-        .from("standings")
-        .delete()
-        .eq("league_code", leagueCode);
+      await supabase.from("standings").delete().eq("league_code", leagueCode);
 
       return NextResponse.json({
         ok: true,
@@ -124,11 +119,7 @@ export async function POST(req: Request) {
     const allFixtures = fixtures as FixtureRow[] | null;
 
     if (!allFixtures || allFixtures.length === 0) {
-      // Nema fixture-a → standings za ligu = prazno
-      await supabase
-        .from("standings")
-        .delete()
-        .eq("league_code", leagueCode);
+      await supabase.from("standings").delete().eq("league_code", leagueCode);
 
       return NextResponse.json({
         ok: true,
@@ -139,7 +130,7 @@ export async function POST(req: Request) {
 
     const fixtureIds = allFixtures.map((f) => f.id);
 
-    // 4) Učitaj sve rezultate za te fixture-e
+    // 4) Učitaj sve rezultate
     const { data: results, error: rErr } = await supabase
       .from("results")
       .select("fixture_id, home_goals, away_goals")
@@ -152,15 +143,12 @@ export async function POST(req: Request) {
       );
     }
 
-    const allResults = (results as ResultRow[] | null) ?? [];
-
-    // Ako nema rezultata → standings = 0 za sve timove
     const resultMap = new Map<number, ResultRow>();
-    allResults.forEach((r) => {
+    (results as ResultRow[] | null)?.forEach((r) => {
       resultMap.set(r.fixture_id, r);
     });
 
-    // 5) Inicijaliziraj stats za sve timove u ligi
+    // 5) Inicijaliziraj statistiku timova
     const stats = new Map<number, TeamStats>();
 
     for (const t of realTeams) {
@@ -180,10 +168,10 @@ export async function POST(req: Request) {
       });
     }
 
-    // 6) Prođi kroz sve fixture-e i rezultate
+    // 6) Obradi rezultate svih fixture-a
     for (const fx of allFixtures) {
       const res = resultMap.get(fx.id);
-      if (!res) continue; // bez rezultata, preskoči
+      if (!res) continue;
 
       const homeId = Number(fx.home_team_id);
       const awayId = Number(fx.away_team_id);
@@ -191,30 +179,26 @@ export async function POST(req: Request) {
       const homeStats = stats.get(homeId);
       const awayStats = stats.get(awayId);
 
-      // ignoriaraj fixture-e gdje tim nije "pravi" (placeholder ili druga liga)
       if (!homeStats || !awayStats) continue;
 
-      // dodaj meta info (group_code, phase) ako još nije setirano
       if (!homeStats.group_code) homeStats.group_code = fx.group_code ?? null;
       if (!homeStats.phase) homeStats.phase = fx.phase ?? null;
+
       if (!awayStats.group_code) awayStats.group_code = fx.group_code ?? null;
       if (!awayStats.phase) awayStats.phase = fx.phase ?? null;
 
       const hg = res.home_goals ?? 0;
       const ag = res.away_goals ?? 0;
 
-      // UT
       homeStats.ut += 1;
       awayStats.ut += 1;
 
-      // golovi
       homeStats.gplus += hg;
       homeStats.gminus += ag;
 
       awayStats.gplus += ag;
       awayStats.gminus += hg;
 
-      // pobjeda / neriješeno / poraz
       if (hg > ag) {
         homeStats.p += 1;
         awayStats.i += 1;
@@ -231,38 +215,33 @@ export async function POST(req: Request) {
       }
     }
 
-    // 7) Izračunaj GR
-    for (const s of stats.values()) {
+    // 7) Izračunaj gol-razliku (GR) — SIGURNO za TS target
+    for (const s of Array.from(stats.values())) {
       s.gr = s.gplus - s.gminus;
     }
 
     // 8) Očisti standings za ligu i upiši nove
-    await supabase
-      .from("standings")
-      .delete()
-      .eq("league_code", leagueCode);
+    await supabase.from("standings").delete().eq("league_code", leagueCode);
 
     const rowsToInsert = Array.from(stats.values());
 
     if (rowsToInsert.length > 0) {
-      const { error: insErr } = await supabase
-        .from("standings")
-        .insert(
-          rowsToInsert.map((s) => ({
-            team_id: s.team_id,
-            league_code: s.league_code,
-            ut: s.ut,
-            p: s.p,
-            n: s.n,
-            i: s.i,
-            gplus: s.gplus,
-            gminus: s.gminus,
-            gr: s.gr,
-            bodovi: s.bodovi,
-            group_code: s.group_code,
-            phase: s.phase,
-          }))
-        );
+      const { error: insErr } = await supabase.from("standings").insert(
+        rowsToInsert.map((s) => ({
+          team_id: s.team_id,
+          league_code: s.league_code,
+          ut: s.ut,
+          p: s.p,
+          n: s.n,
+          i: s.i,
+          gplus: s.gplus,
+          gminus: s.gminus,
+          gr: s.gr,
+          bodovi: s.bodovi,
+          group_code: s.group_code,
+          phase: s.phase,
+        }))
+      );
 
       if (insErr) {
         return NextResponse.json(
