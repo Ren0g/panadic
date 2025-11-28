@@ -6,17 +6,53 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 
-export default function LiveMatchesToday() {
+export default function LiveMatchesAuto() {
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const today = new Date().toISOString().slice(0, 10);
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
+  // -------------------------
+  // INITIAL LOAD → AUTO NEXT ROUND
+  // -------------------------
   useEffect(() => {
-    loadForDate(selectedDate);
-  }, [selectedDate]);
+    loadInitial();
+  }, []);
 
+  async function loadInitial() {
+    setLoading(true);
+
+    // 1) UČITAJ SVE FIXTURE DATUME
+    const { data: allFixtures, error } = await supabase
+      .from("fixtures")
+      .select("match_date")
+      .order("match_date");
+
+    if (error || !allFixtures) {
+      console.error(error);
+      setLoading(false);
+      return;
+    }
+
+    // 2) PRONADI PRVI BUDUCI DATUM
+    const now = new Date();
+    let nextDate = allFixtures
+      .map((f) => f.match_date)
+      .find((d) => new Date(d) >= now);
+
+    // Ako bas nema buducih (teoretski), padne na zadnji
+    if (!nextDate) {
+      nextDate = allFixtures[allFixtures.length - 1]?.match_date;
+    }
+
+    setSelectedDate(nextDate);
+    loadForDate(nextDate);
+  }
+
+  // -------------------------
+  // LOAD FOR SELECTED DATE
+  // -------------------------
   async function loadForDate(dateString: string) {
     setLoading(true);
 
@@ -62,6 +98,11 @@ export default function LiveMatchesToday() {
     setLoading(false);
   }
 
+  // Ako korisnik manuelno promijeni datum
+  useEffect(() => {
+    if (selectedDate) loadForDate(selectedDate);
+  }, [selectedDate]);
+
   return (
     <div className="max-w-lg mx-auto p-4 space-y-5">
       <div className="flex justify-between items-center">
@@ -77,12 +118,13 @@ export default function LiveMatchesToday() {
         </button>
       </div>
 
+      {/* DATUM SELECTOR */}
       <div className="bg-[#f7f1e6] p-4 rounded-xl border border-[#c8b59a] flex items-center gap-4">
         <span className="font-semibold text-[#0A5E2A]">Datum:</span>
 
         <input
           type="date"
-          value={selectedDate}
+          value={selectedDate ?? ""}
           onChange={(e) => setSelectedDate(e.target.value)}
           className="px-3 py-2 border rounded-lg"
         />
