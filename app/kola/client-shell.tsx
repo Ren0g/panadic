@@ -1,7 +1,6 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
 import ClientKola from "./client";
 
 const leagueMap: Record<string, string> = {
@@ -33,9 +32,6 @@ export default function ClientShell() {
     );
   }
 
-  return (
-    <Suspense fallback={<div>Učitavanje kola…</div>}>
-      <ClientKola leagueCode={leagueMap[league]} />
-    </Suspense>
-  );
+  // 🚨 BEZ SUSPENSE — DA VIDIMO ERROR
+  return <ClientKola leagueCode={leagueMap[league]} />;
 }
