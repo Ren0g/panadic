@@ -1,14 +1,52 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabaseClient";
 
-// Tipovi ostaju isti kao kod tebe…
+// ========================================================
+// TIPOVI — obavezno!
+// ========================================================
+
+type FixtureRow = {
+  id: number;
+  home_team_id: number;
+  away_team_id: number;
+  league_code: string;
+  group_code: string | null;
+  phase: string | null;
+};
+
+type ResultRow = {
+  fixture_id: number;
+  home_goals: number;
+  away_goals: number;
+};
+
+type TeamRow = {
+  id: number;
+  league_code: string;
+  is_placeholder: boolean | null;
+};
+
+type TeamStats = {
+  team_id: number;
+  league_code: string;
+  ut: number; 
+  p: number;
+  n: number;
+  i: number;
+  gplus: number;
+  gminus: number;
+  gr: number;
+  bodovi: number;
+  group_code: string | null;
+  phase: string | null;
+};
 
 // ========================================================
-// HELPER — centralna logika recalculacije
+// CENTRALNA FUNKCIJA
 // ========================================================
 
 async function recalc(fixtureId: number) {
-  // 1) Nađi fixture i ligu
+  // 1) Fixture
   const { data: fixture, error: fxErr } = await supabase
     .from("fixtures")
     .select("id, home_team_id, away_team_id, league_code, group_code, phase")
@@ -19,9 +57,9 @@ async function recalc(fixtureId: number) {
     return { error: "Fixture nije pronađen.", status: 404 };
   }
 
-  const leagueCode = fixture.league_code as string;
+  const leagueCode = fixture.league_code;
 
-  // 2) Učitaj sve timove te lige (bez placeholdera)
+  // 2) Teams
   const { data: teams, error: tErr } = await supabase
     .from("teams")
     .select("id, league_code, is_placeholder")
@@ -37,9 +75,7 @@ async function recalc(fixtureId: number) {
     return { ok: true, league_code: leagueCode, teamsUpdated: 0 };
   }
 
-  const teamIds = realTeams.map((t) => t.id);
-
-  // 3) Učitaj sve fixture-e za ligu
+  // 3) Fixtures
   const { data: fixtures, error: fErr } = await supabase
     .from("fixtures")
     .select("id, home_team_id, away_team_id, league_code, group_code, phase")
@@ -47,16 +83,11 @@ async function recalc(fixtureId: number) {
 
   if (fErr) return { error: "Greška pri čitanju fixtures.", status: 500 };
 
-  const allFixtures = fixtures as FixtureRow[] | null;
-
-  if (!allFixtures || allFixtures.length === 0) {
-    await supabase.from("standings").delete().eq("league_code", leagueCode);
-    return { ok: true, league_code: leagueCode, teamsUpdated: 0 };
-  }
+  const allFixtures = fixtures as FixtureRow[];
 
   const fixtureIds = allFixtures.map((f) => f.id);
 
-  // 4) Učitaj sve rezultate
+  // 4) Results
   const { data: results, error: rErr } = await supabase
     .from("results")
     .select("fixture_id, home_goals, away_goals")
@@ -65,11 +96,11 @@ async function recalc(fixtureId: number) {
   if (rErr) return { error: "Greška pri čitanju results.", status: 500 };
 
   const resultMap = new Map<number, ResultRow>();
-  (results as ResultRow[] | null)?.forEach((r) => {
+  (results as ResultRow[]).forEach((r) => {
     resultMap.set(r.fixture_id, r);
   });
 
-  // 5) stats init
+  // 5) Init stats
   const stats = new Map<number, TeamStats>();
 
   for (const t of realTeams) {
@@ -94,19 +125,12 @@ async function recalc(fixtureId: number) {
     const res = resultMap.get(fx.id);
     if (!res) continue;
 
-    const homeId = Number(fx.home_team_id);
-    const awayId = Number(fx.away_team_id);
+    const homeId = fx.home_team_id;
+    const awayId = fx.away_team_id;
 
     const homeStats = stats.get(homeId);
     const awayStats = stats.get(awayId);
-
     if (!homeStats || !awayStats) continue;
-
-    if (!homeStats.group_code) homeStats.group_code = fx.group_code ?? null;
-    if (!homeStats.phase) homeStats.phase = fx.phase ?? null;
-
-    if (!awayStats.group_code) awayStats.group_code = fx.group_code ?? null;
-    if (!awayStats.phase) awayStats.phase = fx.phase ?? null;
 
     const hg = res.home_goals ?? 0;
     const ag = res.away_goals ?? 0;
@@ -135,55 +159,33 @@ async function recalc(fixtureId: number) {
     }
   }
 
-  // 7) GR — FIXED for TS
+  // 7) Gol-razlika — SAFE
   for (const s of Array.from(stats.values())) {
     s.gr = s.gplus - s.gminus;
   }
 
-  // 8) Očisti standings i upiši nove
+  // 8) Brisanje + insert
   await supabase.from("standings").delete().eq("league_code", leagueCode);
 
   const rowsToInsert = Array.from(stats.values());
 
   if (rowsToInsert.length > 0) {
-    const { error: insErr } = await supabase.from("standings").insert(
-      rowsToInsert.map((s) => ({
-        team_id: s.team_id,
-        league_code: s.league_code,
-        ut: s.ut,
-        p: s.p,
-        n: s.n,
-        i: s.i,
-        gplus: s.gplus,
-        gminus: s.gminus,
-        gr: s.gr,
-        bodovi: s.bodovi,
-        group_code: s.group_code,
-        phase: s.phase,
-      }))
-    );
-
+    const { error: insErr } = await supabase.from("standings").insert(rowsToInsert);
     if (insErr) return { error: "Greška pri upisu standings.", status: 500 };
   }
 
-  return {
-    ok: true,
-    league_code: leagueCode,
-    teamsUpdated: rowsToInsert.length,
-  };
+  return { ok: true, league_code: leagueCode, teamsUpdated: rowsToInsert.length };
 }
 
 // ========================================================
-// PUBLIC HANDLERS
+// GET (za browser)
 // ========================================================
 
-// ✔ GET omogućuje otvaranje linka u browseru
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const rawFixtureId = url.searchParams.get("fixtureId");
-  const fixtureId = Number(rawFixtureId);
+  const fixtureId = Number(url.searchParams.get("fixtureId"));
 
-  if (!fixtureId || !Number.isFinite(fixtureId)) {
+  if (!fixtureId) {
     return NextResponse.json(
       { error: "fixtureId je obavezan i mora biti broj." },
       { status: 400 }
@@ -191,23 +193,25 @@ export async function GET(req: Request) {
   }
 
   const result = await recalc(fixtureId);
-
   return NextResponse.json(result);
 }
 
-// ✔ POST omogućuje pozivanje iz koda
+// ========================================================
+// POST (za backend pozive)
+// ========================================================
+
 export async function POST(req: Request) {
   const url = new URL(req.url);
   const query = url.searchParams.get("fixtureId");
 
-  let body = {};
+  let body: any = {};
   try {
     body = await req.json();
   } catch {}
 
-  const fixtureId = Number((body as any).fixtureId ?? query);
+  const fixtureId = Number(body.fixtureId ?? query);
 
-  if (!fixtureId || !Number.isFinite(fixtureId)) {
+  if (!fixtureId) {
     return NextResponse.json(
       { error: "fixtureId je obavezan i mora biti broj." },
       { status: 400 }
@@ -215,6 +219,5 @@ export async function POST(req: Request) {
   }
 
   const result = await recalc(fixtureId);
-
   return NextResponse.json(result);
 }
