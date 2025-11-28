@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 export default function LiveMatch({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const fixtureId = params.id; // FIX — STRING, NE NUMBER
+  const fixtureId = Number(params.id); // OVO JE ISPRAVNO ZA tvoju bazu
 
   const [homeTeam, setHomeTeam] = useState("");
   const [awayTeam, setAwayTeam] = useState("");
@@ -21,7 +21,7 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
   async function loadMatch() {
     setLoading(true);
 
-    // 1) Ucitaj fixture po ID-u (kao string)
+    // 1) Dohvati fixture (BIGINT usporedba = broj!)
     const { data: fixture, error: fxErr } = await supabase
       .from("fixtures")
       .select("*")
@@ -39,17 +39,13 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
       .from("teams")
       .select("id, name");
 
-    const home = teams?.find(
-      (t) => String(t.id) === String(fixture.home_team_id)
-    );
-    const away = teams?.find(
-      (t) => String(t.id) === String(fixture.away_team_id)
-    );
+    const home = teams?.find((t) => Number(t.id) === Number(fixture.home_team_id));
+    const away = teams?.find((t) => Number(t.id) === Number(fixture.away_team_id));
 
     setHomeTeam(home?.name ?? "Nepoznato");
     setAwayTeam(away?.name ?? "Nepoznato");
 
-    // 3) Dohvati rezultat
+    // 3) Ucitaj postojeći rezultat
     const { data: results } = await supabase
       .from("results")
       .select("*")
@@ -65,7 +61,7 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
 
   async function save() {
     await supabase.from("results").upsert({
-      fixture_id: fixtureId,     // FIX—STRING MATCHES DB
+      fixture_id: fixtureId, // BROJ, jer je results.fixture_id BIGINT
       home_goals: homeGoals,
       away_goals: awayGoals,
     });
@@ -107,7 +103,6 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
             +
           </button>
 
-          {/* SCORE */}
           <div className="text-4xl font-bold">
             {homeGoals}:{awayGoals}
           </div>
@@ -146,7 +141,6 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
       >
         Spremi rezultat
       </button>
-
     </div>
   );
 }
