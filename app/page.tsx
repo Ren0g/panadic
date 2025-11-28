@@ -152,17 +152,7 @@ export default function HomePage() {
   return (
     <div className="w-full max-w-5xl mx-auto px-4 py-10 space-y-10">
 
-      {/* HEADER DODAN */}
-      <div className="text-center mb-6">
-        <h1 className="text-3xl font-extrabold text-[#0A5E2A]">
-          Malonogometna liga Panadić
-        </h1>
-        <p className="text-lg text-gray-700">
-          Sezona 2025/2026
-        </p>
-      </div>
-
-      {/* ---- LIVE BANNER ---- */}
+      {/* ---- LIVE / NEXT MATCH ---- */}
       <div className="bg-white rounded-xl border border-[#d9cbb1] shadow p-5">
         {loadingMatch ? (
           <div className="text-center text-gray-500 text-sm">
@@ -221,7 +211,7 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* SELECTOR */}
+      {/* ---- LEAGUE SELECTOR ---- */}
       <div className="flex justify-center">
         <LeagueSelector
           leagues={LEAGUES}
@@ -230,7 +220,7 @@ export default function HomePage() {
         />
       </div>
 
-      {/* No league selected */}
+      {/* ---- MESSAGE IF NO LEAGUE SELECTED ---- */}
       {!selectedLeague && (
         <div className="rounded-xl border border-[#d9cbb1] bg-white px-6 py-8 text-center shadow max-w-xl mx-auto">
           <p className="text-lg font-medium mb-2">Odaberi ligu iz izbornika.</p>
@@ -240,7 +230,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* LEAGUE VIEW */}
+      {/* ---- LEAGUE VIEW ---- */}
       {selectedLeague && (
         <div className="w-full mt-6">
           <h2 className="text-2xl font-semibold mb-4 text-[#0b5b2a] text-center">
