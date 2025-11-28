@@ -36,17 +36,21 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
       .eq("id", fixtureId)
       .single();
 
-    if (error) {
+    if (error || !data) {
       console.error(error);
       setLoading(false);
       return;
     }
 
+    // FIX: home/away su array → pretvoriti u pojedinačan objekt
+    const homeRel = Array.isArray(data.home) ? data.home[0] : data.home;
+    const awayRel = Array.isArray(data.away) ? data.away[0] : data.away;
+
     const result = data.results?.[0] || {};
 
     setMatch({
-      home_team: data.home?.name ?? "",
-      away_team: data.away?.name ?? "",
+      home_team: homeRel?.name ?? "",
+      away_team: awayRel?.name ?? ""
     });
 
     setHomeGoals(result.home_goals ?? 0);
@@ -94,7 +98,7 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
           {/* HOME - */}
           <button
             onClick={() => setHomeGoals((x) => Math.max(0, x - 1))}
-            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow"
+            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
           >
             –
           </button>
@@ -105,7 +109,7 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
           {/* HOME + */}
           <button
             onClick={() => setHomeGoals((x) => x + 1)}
-            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow"
+            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
           >
             +
           </button>
@@ -113,7 +117,7 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
           {/* AWAY - */}
           <button
             onClick={() => setAwayGoals((x) => Math.max(0, x - 1))}
-            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow"
+            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
           >
             –
           </button>
@@ -123,7 +127,7 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
           {/* AWAY + */}
           <button
             onClick={() => setAwayGoals((x) => x + 1)}
-            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow"
+            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
           >
             +
           </button>
@@ -132,7 +136,7 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
 
       <button
         onClick={save}
-        className="w-full bg-[#0A5E2A] text-white py-3 rounded-xl shadow text-lg"
+        className="w-full bg-[#0A5E2A] text-white py-3 rounded-xl shadow text-lg active:scale-95"
       >
         Spremi rezultat
       </button>
