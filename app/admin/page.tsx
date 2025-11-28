@@ -28,14 +28,14 @@ export default function AdminPage() {
   const [authorized, setAuthorized] = useState(false);
 
   const [view, setView] = useState<"CURRENT" | "ALL">("CURRENT");
-
   const [league, setLeague] = useState<LeagueCode | "">("");
   const [fixtures, setFixtures] = useState<any[]>([]);
   const [nextRound, setNextRound] = useState<number | null>(null);
-
   const [loading, setLoading] = useState(false);
 
-  function tryLogin() {
+  // ⛔ ENTER LOGIN ENABLED
+  function tryLogin(e: any) {
+    e.preventDefault();
     if (password === "panadic2025") setAuthorized(true);
     else alert("Pogrešna lozinka");
   }
@@ -56,7 +56,7 @@ export default function AdminPage() {
         home:home_team_id ( name ),
         away:away_team_id ( name ),
         results:results ( home_goals, away_goals )
-      `
+        `
       )
       .eq("league_code", dbCode)
       .order("round")
@@ -119,10 +119,15 @@ export default function AdminPage() {
     if (league) loadFixtures(league);
   }
 
-  // LOGIN
+  // ---------------------
+  // LOGIN SCREEN
+  // ---------------------
   if (!authorized) {
     return (
-      <div className="max-w-sm mx-auto mt-20 bg-white p-6 rounded-xl shadow border border-gray-300">
+      <form
+        onSubmit={tryLogin}
+        className="max-w-sm mx-auto mt-20 bg-white p-6 rounded-xl shadow border border-gray-300"
+      >
         <h1 className="text-xl font-semibold mb-4 text-center">Admin login</h1>
 
         <input
@@ -133,43 +138,44 @@ export default function AdminPage() {
         />
 
         <button
-          onClick={tryLogin}
-          className="w-full bg-[#0A5E2A] text-white py-2 rounded-lg"
+          type="submit"
+          className="w-full py-2 rounded-lg text-white cursor-pointer bg-[#f37c22] hover:bg-[#d96d1c] shadow"
         >
           Prijava
         </button>
-      </div>
+      </form>
     );
   }
 
+  // ---------------------
+  // ADMIN PANEL
+  // ---------------------
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
 
-      {/* NASLOV – CENTRIRAN */}
       <div className="text-center space-y-4">
         <h1 className="text-2xl font-bold text-[#0A5E2A]">
           Admin panel — Unos rezultata
         </h1>
 
-        {/* GUMBI — CENTRIRANI */}
         <div className="flex justify-center gap-4">
           <button
             onClick={() => (window.location.href = "/admin/live")}
-            className="px-4 py-2 bg-red-600 text-white rounded-full shadow"
+            className="px-4 py-2 rounded-full text-white cursor-pointer bg-red-600 hover:bg-red-700 shadow"
           >
             LIVE unos rezultata
           </button>
 
           <button
-            className="px-4 py-2 bg-[#f7f1e6] border border-[#c8b59a] rounded-full text-[#0A5E2A] shadow"
             onClick={() => (window.location.href = "/")}
+            className="px-4 py-2 rounded-full cursor-pointer bg-[#f7f1e6] border border-[#c8b59a] text-[#0A5E2A] shadow"
           >
             ← Povratak na početnu
           </button>
         </div>
       </div>
 
-      {/* IZBOR LIGE */}
+      {/* ▼ LIGA SELECTOR */}
       <div className="bg-[#f7f1e6] p-4 rounded-xl border border-[#c8b59a] text-center">
         <label className="font-semibold text-[#0A5E2A]">Odaberi ligu:</label>
 
@@ -180,7 +186,7 @@ export default function AdminPage() {
             setLeague(val);
             if (val !== "") loadFixtures(val);
           }}
-          className="ml-4 px-3 py-2 border rounded-lg"
+          className="ml-4 px-3 py-2 border rounded-lg cursor-pointer"
         >
           <option value="">— odaberi —</option>
           <option value="PIONIRI">Pioniri</option>
@@ -193,12 +199,12 @@ export default function AdminPage() {
         </select>
       </div>
 
-      {/* GUMBI ZA VIEW */}
+      {/* ▼ VIEW BUTTONS */}
       {league && (
         <div className="flex gap-4 justify-center">
           <button
             onClick={() => setView("CURRENT")}
-            className={`px-4 py-2 rounded-full border ${
+            className={`px-4 py-2 rounded-full border cursor-pointer ${
               view === "CURRENT"
                 ? "bg-[#0A5E2A] text-white"
                 : "bg-[#f7f1e6] text-[#0A5E2A] border-[#c8b59a]"
@@ -209,7 +215,7 @@ export default function AdminPage() {
 
           <button
             onClick={() => setView("ALL")}
-            className={`px-4 py-2 rounded-full border ${
+            className={`px-4 py-2 rounded-full border cursor-pointer ${
               view === "ALL"
                 ? "bg-[#0A5E2A] text-white"
                 : "bg-[#f7f1e6] text-[#0A5E2A] border-[#c8b59a]"
@@ -220,12 +226,13 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* SADRŽAJ */}
+      {/* ▼ LOADING */}
       {loading && <div>Učitavanje...</div>}
 
+      {/* ▼ FIXTURE UI (bez promjena) */}
       {league && !loading && (
         <>
-          {/* ➤ AKTUALNO KOLO */}
+          {/* ACTUAL ROUND */}
           {view === "CURRENT" && nextRound && (
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-[#0A5E2A] text-center">
@@ -276,7 +283,7 @@ export default function AdminPage() {
                         onClick={() =>
                           saveResult(fx.id, fx.home_goals, fx.away_goals)
                         }
-                        className="px-4 py-2 bg-[#0A5E2A] text-white rounded-lg"
+                        className="px-4 py-2 text-white rounded-lg cursor-pointer bg-[#f37c22] hover:bg-[#d96d1c]"
                       >
                         Spremi
                       </button>
@@ -284,7 +291,7 @@ export default function AdminPage() {
                       {(fx.home_goals !== "" || fx.away_goals !== "") && (
                         <button
                           onClick={() => deleteResult(fx.id)}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg"
+                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg cursor-pointer"
                         >
                           Obriši
                         </button>
@@ -295,7 +302,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ➤ SVA KOLA */}
+          {/* ALL ROUNDS (NIŠTA NE DIRAM) */}
           {view === "ALL" && (
             <div className="space-y-8">
               {Object.keys(
@@ -359,7 +366,7 @@ export default function AdminPage() {
                               onClick={() =>
                                 saveResult(fx.id, fx.home_goals, fx.away_goals)
                               }
-                              className="px-4 py-2 bg-[#0A5E2A] text-white rounded-lg"
+                              className="px-4 py-2 bg-[#f37c22] hover:bg-[#d96d1c] text-white rounded-lg cursor-pointer"
                             >
                               Spremi
                             </button>
@@ -367,7 +374,7 @@ export default function AdminPage() {
                             {(fx.home_goals !== "" || fx.away_goals !== "") && (
                               <button
                                 onClick={() => deleteResult(fx.id)}
-                                className="px-4 py-2 bg-red-600 text-white rounded-lg"
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg cursor-pointer"
                               >
                                 Obriši
                               </button>
@@ -382,13 +389,13 @@ export default function AdminPage() {
         </>
       )}
 
-      {/* ➤ LINK NA BACKUP PANEL — NA DNU DESNO */}
+      {/* ▼ BACKUP BUTTON — NARANČASTI */}
       <div className="flex justify-end mt-10">
         <button
           onClick={() => (window.location.href = "/admin/backup")}
-          className="text-sm text-blue-600 underline hover:no-underline"
+          className="px-4 py-2 text-white rounded-full cursor-pointer bg-[#f37c22] hover:bg-[#d96d1c] shadow"
         >
-          ➡️ Napredno: Backup sustav
+          🟧 Napredno: Backup sustav
         </button>
       </div>
     </div>
