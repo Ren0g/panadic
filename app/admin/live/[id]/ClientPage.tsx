@@ -96,7 +96,7 @@ export default function ClientPage({ fixtureId }: { fixtureId: string }) {
       });
     }
 
-    router.push("/admin/live");
+    // ❗ NE IDE VIŠE NIKAMO — ekran ostaje otvoren
   }
 
   if (loading) return <div className="p-4">Učitavanje...</div>;
@@ -167,6 +167,13 @@ export default function ClientPage({ fixtureId }: { fixtureId: string }) {
         className="w-full bg-[#0A5E2A] text-white py-3 rounded-xl shadow text-lg"
       >
         Spremi rezultat
+      </button>
+
+      <button
+        onClick={() => router.push("/admin/live")}
+        className="w-full bg-gray-300 text-black py-3 rounded-xl shadow text-lg"
+      >
+        Natrag na popis utakmica
       </button>
     </div>
   );
