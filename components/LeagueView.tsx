@@ -189,7 +189,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
             onClick={() =>
               (window.location.href = `/kola?league=${leagueCode}`)
             }
-            className="px-4 py-2 bg-white text-[#0A5E2A] font-semibold rounded-full border border-[#e3d4bf] shadow hover:bg-[#f7f1e6]"
+            className="px-4 py-2 bg-[#f7f1e6] text-[#0A5E2A] font-semibold rounded-full border border-[#e3d4bf] shadow hover:bg-[#f0e6ce] transition"
           >
             Pogledaj sva kola →
           </button>
