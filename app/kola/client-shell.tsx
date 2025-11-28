@@ -1,6 +1,7 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense } from "react";
 import ClientKola from "./client";
 
 const leagueMap: Record<string, string> = {
@@ -15,6 +16,8 @@ const leagueMap: Record<string, string> = {
 
 export default function ClientShell() {
   const params = useSearchParams();
+  const router = useRouter();
+
   const raw = params.get("league");
   const league =
     typeof raw === "string" ? raw.trim().toUpperCase() : null;
@@ -32,6 +35,19 @@ export default function ClientShell() {
     );
   }
 
-  // 🚨 BEZ SUSPENSE — DA VIDIMO ERROR
-  return <ClientKola leagueCode={leagueMap[league]} />;
+  return (
+    <div className="p-4 space-y-6">
+      {/* GUMB NATRAG */}
+      <button
+        onClick={() => router.push(`/?league=${league}`)}
+        className="px-4 py-2 bg-[#0b5b2a] text-white rounded-full shadow hover:bg-[#0a4d23] transition"
+      >
+        ← Natrag na tablicu
+      </button>
+
+      <Suspense fallback={<div>Učitavanje kola…</div>}>
+        <ClientKola leagueCode={leagueMap[league]} />
+      </Suspense>
+    </div>
+  );
 }
