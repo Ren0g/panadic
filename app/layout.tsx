@@ -16,7 +16,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-[#f7f1e6] flex flex-col">
 
         {/* HEADER */}
-        <header className="w-full bg-[#0b5b2a] text-[#f7f1e6] shadow">
+        <header className="w-full bg-[#0b5b2a] text-[#f7f1e6] shadow cursor-default">
           <div className="w-full text-center py-4 leading-tight">
 
             {/* RED 1 */}
@@ -53,7 +53,7 @@ export default function RootLayout({
               href="https://promar.hr"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm hover:underline"
+              className="text-sm hover:underline cursor-pointer"
             >
               © 2025 Promar.hr
             </a>
