@@ -119,7 +119,7 @@ export default function AdminPage() {
     if (league) loadFixtures(league);
   }
 
-  // LOGIN EKRAN
+  // LOGIN
   if (!authorized) {
     return (
       <div className="max-w-sm mx-auto mt-20 bg-white p-6 rounded-xl shadow border border-gray-300">
@@ -144,13 +144,15 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
-      {/* HEADER */}
-      <div className="flex justify-between items-center">
+
+      {/* NASLOV – CENTRIRAN */}
+      <div className="text-center space-y-4">
         <h1 className="text-2xl font-bold text-[#0A5E2A]">
           Admin panel — Unos rezultata
         </h1>
 
-        <div className="flex gap-3">
+        {/* GUMBI — CENTRIRANI, JEDAN DO DRUGOG */}
+        <div className="flex justify-center gap-4">
           <button
             onClick={() => (window.location.href = "/admin/live")}
             className="px-4 py-2 bg-red-600 text-white rounded-full shadow"
@@ -168,7 +170,7 @@ export default function AdminPage() {
       </div>
 
       {/* IZBOR LIGE */}
-      <div className="bg-[#f7f1e6] p-4 rounded-xl border border-[#c8b59a]">
+      <div className="bg-[#f7f1e6] p-4 rounded-xl border border-[#c8b59a] text-center">
         <label className="font-semibold text-[#0A5E2A]">Odaberi ligu:</label>
 
         <select
@@ -193,7 +195,7 @@ export default function AdminPage() {
 
       {/* GUMBI ZA VIEW */}
       {league && (
-        <div className="flex gap-4">
+        <div className="flex gap-4 justify-center">
           <button
             onClick={() => setView("CURRENT")}
             className={`px-4 py-2 rounded-full border ${
@@ -223,10 +225,10 @@ export default function AdminPage() {
 
       {league && !loading && (
         <>
-          {/* ➤ PRIKAZ AKTUALNOG KOLA */}
+          {/* ➤ AKTUALNO KOLO */}
           {view === "CURRENT" && nextRound && (
             <div className="space-y-6">
-              <h2 className="text-xl font-bold text-[#0A5E2A]">
+              <h2 className="text-xl font-bold text-[#0A5E2A] text-center">
                 {nextRound}. kolo
               </h2>
 
@@ -237,15 +239,15 @@ export default function AdminPage() {
                     key={fx.id}
                     className="bg-white p-4 rounded-xl border border-[#e2d5bd] shadow"
                   >
-                    <div className="font-semibold text-[#0b5b2a] mb-2">
+                    <div className="font-semibold text-[#0b5b2a] mb-2 text-center">
                       {fx.home_team} vs {fx.away_team}
                     </div>
 
-                    <div className="text-sm text-gray-600 mb-3">
+                    <div className="text-sm text-gray-600 mb-3 text-center">
                       {fx.match_date} u {fx.match_time.substring(0, 5)}
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 justify-center">
                       <input
                         type="number"
                         min="0"
@@ -274,9 +276,7 @@ export default function AdminPage() {
                         onClick={() =>
                           saveResult(fx.id, fx.home_goals, fx.away_goals)
                         }
-                        className="
-                          px-4 py-2 bg-[#0A5E2A] text-white rounded-lg
-                        "
+                        className="px-4 py-2 bg-[#0A5E2A] text-white rounded-lg"
                       >
                         Spremi
                       </button>
@@ -295,7 +295,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ➤ PRIKAZ SVIH KOLA */}
+          {/* ➤ SVA KOLA */}
           {view === "ALL" && (
             <div className="space-y-8">
               {Object.keys(
@@ -311,7 +311,7 @@ export default function AdminPage() {
                     key={round}
                     className="bg-[#f7f1e6] p-4 rounded-xl border border-[#c8b59a]"
                   >
-                    <h2 className="text-xl font-bold text-[#0A5E2A] mb-3">
+                    <h2 className="text-xl font-bold text-[#0A5E2A] mb-3 text-center">
                       {round}. kolo
                     </h2>
 
@@ -322,15 +322,15 @@ export default function AdminPage() {
                           key={fx.id}
                           className="bg-white p-4 mb-3 rounded-lg border border-[#e2d5bd] shadow"
                         >
-                          <div className="font-semibold text-[#0b5b2a] mb-2">
+                          <div className="font-semibold text-[#0b5b2a] mb-2 text-center">
                             {fx.home_team} vs {fx.away_team}
                           </div>
 
-                          <div className="text-sm text-gray-600 mb-3">
+                          <div className="text-sm text-gray-600 mb-3 text-center">
                             {fx.match_date} u {fx.match_time.substring(0, 5)}
                           </div>
 
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-4 justify-center">
                             <input
                               type="number"
                               min="0"
