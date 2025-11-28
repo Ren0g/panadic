@@ -59,106 +59,111 @@ export default function HomePage() {
   const currentLabel =
     LEAGUES.find((l) => l.code === selectedLeague)?.label ?? "";
 
-  // -----------------------------------------
-  // LOAD CURRENT / UPCOMING MATCH
-  // -----------------------------------------
+  // ---------------------------------------------------------
+  // LOAD CURRENT MATCH  + AUTO REFRESH every 10 seconds
+  // ---------------------------------------------------------
   useEffect(() => {
-    const loadMatch = async () => {
-      setLoadingMatch(true);
+    loadMatch();
 
-      const { data: fixtures, error } = await supabase
-        .from("fixtures")
-        .select(
-          "id, league_code, round, match_date, match_time, home_team_id, away_team_id"
-        );
+    const interval = setInterval(() => {
+      loadMatch(); // auto refresh
+    }, 10000); // 10 sekundi
 
-      if (!fixtures || error) {
+    return () => clearInterval(interval);
+  }, []);
+
+  async function loadMatch() {
+    setLoadingMatch(true);
+
+    const { data: fixtures, error } = await supabase
+      .from("fixtures")
+      .select(
+        "id, league_code, round, match_date, match_time, home_team_id, away_team_id"
+      );
+
+    if (!fixtures || error) {
+      setLoadingMatch(false);
+      return;
+    }
+
+    const now = Date.now();
+    const withDT = fixtures.map((f: any) => ({
+      ...f,
+      dt: new Date(`${f.match_date}T${f.match_time ?? "00:00"}`).getTime(),
+    }));
+
+    // Live candidates
+    const live = withDT.filter((f) => {
+      const start = f.dt - LIVE_WINDOW_BEFORE_MS;
+      const end = f.dt + LIVE_WINDOW_AFTER_MS;
+      return now >= start && now <= end;
+    });
+
+    let chosen: any = null;
+    let status: "live" | "upcoming" = "upcoming";
+
+    if (live.length > 0) {
+      live.sort(
+        (a, b) => Math.abs(a.dt - now) - Math.abs(b.dt - now)
+      );
+      chosen = live[0];
+      status = "live";
+    } else {
+      const future = withDT
+        .filter((f) => f.dt > now)
+        .sort((a, b) => a.dt - b.dt);
+
+      if (future.length > 0) {
+        chosen = future[0];
+      } else {
+        setCurrentMatch(null);
         setLoadingMatch(false);
         return;
       }
+    }
 
-      const now = Date.now();
-      const withDT = fixtures.map((f: any) => ({
-        ...f,
-        dt: new Date(`${f.match_date}T${f.match_time ?? "00:00"}`).getTime(),
-      }));
+    // Load teams
+    const { data: teams } = await supabase
+      .from("teams")
+      .select("id,name")
+      .in("id", [chosen.home_team_id, chosen.away_team_id]);
 
-      // LIVE candidates
-      const live = withDT.filter((f) => {
-        const start = f.dt - LIVE_WINDOW_BEFORE_MS;
-        const end = f.dt + LIVE_WINDOW_AFTER_MS;
-        return now >= start && now <= end;
-      });
+    const home =
+      teams?.find((t) => Number(t.id) === Number(chosen.home_team_id))
+        ?.name ?? "Nepoznato";
+    const away =
+      teams?.find((t) => Number(t.id) === Number(chosen.away_team_id))
+        ?.name ?? "Nepoznato";
 
-      let chosen: any = null;
-      let status: "live" | "upcoming" = "upcoming";
+    const league_name =
+      LEAGUE_LABELS[chosen.league_code] ?? chosen.league_code;
 
-      if (live.length > 0) {
-        live.sort(
-          (a, b) => Math.abs(a.dt - now) - Math.abs(b.dt - now)
-        );
-        chosen = live[0];
-        status = "live";
-      } else {
-        const future = withDT
-          .filter((f) => f.dt > now)
-          .sort((a, b) => a.dt - b.dt);
+    // Load result
+    const { data: res } = await supabase
+      .from("results")
+      .select("home_goals, away_goals")
+      .eq("fixture_id", chosen.id)
+      .limit(1);
 
-        if (future.length === 0) {
-          setCurrentMatch(null);
-          setLoadingMatch(false);
-          return;
-        }
+    setCurrentMatch({
+      id: chosen.id,
+      league_name,
+      round: chosen.round,
+      match_date: chosen.match_date,
+      match_time: chosen.match_time,
+      home_team: home,
+      away_team: away,
+      home_goals: res?.[0]?.home_goals ?? null,
+      away_goals: res?.[0]?.away_goals ?? null,
+      status,
+    });
 
-        chosen = future[0];
-        status = "upcoming";
-      }
+    setLoadingMatch(false);
+  }
 
-      // Load teams
-      const { data: teams } = await supabase
-        .from("teams")
-        .select("id,name")
-        .in("id", [chosen.home_team_id, chosen.away_team_id]);
-
-      const home =
-        teams?.find((t) => Number(t.id) === Number(chosen.home_team_id))
-          ?.name ?? "Nepoznato";
-      const away =
-        teams?.find((t) => Number(t.id) === Number(chosen.away_team_id))
-          ?.name ?? "Nepoznato";
-
-      const league_name =
-        LEAGUE_LABELS[chosen.league_code] ?? chosen.league_code;
-
-      // Load result
-      const { data: res } = await supabase
-        .from("results")
-        .select("home_goals, away_goals")
-        .eq("fixture_id", chosen.id)
-        .limit(1);
-
-      setCurrentMatch({
-        id: chosen.id,
-        league_name,
-        round: chosen.round,
-        match_date: chosen.match_date,
-        match_time: chosen.match_time,
-        home_team: home,
-        away_team: away,
-        home_goals: res?.[0]?.home_goals ?? null,
-        away_goals: res?.[0]?.away_goals ?? null,
-        status,
-      });
-
-      setLoadingMatch(false);
-    };
-
-    loadMatch();
-  }, []);
-
-  // -----------------------------------------
+  // ---------------------------------------------------------
   // RENDER
-  // -----------------------------------------
+  // ---------------------------------------------------------
   return (
     <div className="w-full max-w-5xl mx-auto px-4 py-10 space-y-8">
 
@@ -177,9 +182,19 @@ export default function HomePage() {
 
             {/* status */}
             <div className="flex justify-between text-xs font-semibold text-[#0A5E2A]">
-              <span>
-                {currentMatch.status === "live" ? "U TIJEKU" : "Sljedeća utakmica"}
+
+              <span className="flex items-center gap-2">
+                {currentMatch.status === "live" ? (
+                  <>
+                    {/* BLINKA CRVENA TOČKA */}
+                    <span className="w-3 h-3 rounded-full bg-red-600 animate-pulse"></span>
+                    U TIJEKU
+                  </>
+                ) : (
+                  "Sljedeća utakmica"
+                )}
               </span>
+
               <span>
                 {currentMatch.league_name} — {currentMatch.round}. kolo
               </span>
