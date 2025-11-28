@@ -1,4 +1,3 @@
-// app/api/backup/delete/route.ts
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -14,11 +13,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // OVA verzija Supabase storage remove PRIMA LISTU STRINGOVA
+    // SUPABASE STORAGE remove → PRIMA LISTU STRINGOVA
     const { error } = await supabase
       .storage
       .from("backups")
-      .remove([backupName]); // ← OVO JE KLJUČNA PROMJENA
+      .remove([backupName]); // ← OVO MORA BITI OVAKO
 
     if (error) {
       return NextResponse.json(
