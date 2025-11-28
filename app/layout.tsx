@@ -17,10 +17,18 @@ export default function RootLayout({
 
         {/* HEADER */}
         <header className="w-full bg-[#0b5b2a] text-[#f7f1e6] shadow">
-          <div className="w-full text-center py-4">
-            <h1 className="text-xl sm:text-2xl font-semibold">
-              Malonogometna liga Panadić 2025/2026. godina
-            </h1>
+          <div className="w-full text-center py-4 leading-tight">
+
+            {/* RED 1 */}
+            <div className="text-xl sm:text-2xl font-semibold">
+              Malonogometna liga Panadić
+            </div>
+
+            {/* RED 2 */}
+            <div className="text-sm sm:text-base opacity-90">
+              Sezona 2025/2026
+            </div>
+
           </div>
         </header>
 
