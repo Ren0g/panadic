@@ -14,10 +14,11 @@ export async function POST(req: Request) {
       );
     }
 
+    // OVA verzija Supabase storage remove PRIMA LISTU STRINGOVA
     const { error } = await supabase
       .storage
       .from("backups")
-      .remove([{ name: backupName }]);
+      .remove([backupName]); // ← OVO JE KLJUČNA PROMJENA
 
     if (error) {
       return NextResponse.json(
