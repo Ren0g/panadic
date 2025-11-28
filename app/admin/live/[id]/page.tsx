@@ -21,7 +21,7 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
   async function loadMatch() {
     setLoading(true);
 
-    // 1) Fixture
+    // === 1) FIXTURE ===
     const { data: fixture } = await supabase
       .from("fixtures")
       .select("*")
@@ -33,22 +33,26 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
       return;
     }
 
-    // 2) Ucitaj timove – popravak: ID pretvaramo u string
+    // === 2) TEAMS (ISPRAVKA: ID-evi pretvoreni u string) ===
     const { data: teams } = await supabase
       .from("teams")
       .select("id, name")
       .in("id", [
         String(fixture.home_team_id),
-        String(fixture.away_team_id)
+        String(fixture.away_team_id),
       ]);
 
-    const home = teams?.find((t) => String(t.id) === String(fixture.home_team_id));
-    const away = teams?.find((t) => String(t.id) === String(fixture.away_team_id));
+    const home = teams?.find(
+      (t) => String(t.id) === String(fixture.home_team_id)
+    );
+    const away = teams?.find(
+      (t) => String(t.id) === String(fixture.away_team_id)
+    );
 
-    setHomeTeam(home?.name ?? "—");
-    setAwayTeam(away?.name ?? "—");
+    setHomeTeam(home?.name ?? "Nepoznato");
+    setAwayTeam(away?.name ?? "Nepoznato");
 
-    // 3) Postojeci rezultat
+    // === 3) REZULTAT ===
     const { data: results } = await supabase
       .from("results")
       .select("*")
@@ -78,6 +82,7 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
 
   return (
     <div className="max-w-md mx-auto p-6 space-y-6">
+
       <button
         onClick={() => router.push("/admin/live")}
         className="px-4 py-2 bg-[#f7f1e6] border border-[#c8b59a] rounded-full text-[#0A5E2A] shadow"
@@ -90,23 +95,17 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
       </h1>
 
       <div className="bg-[#f7f1e6] p-4 rounded-xl border border-[#c8b59a]">
-        <div className="flex justify-between items-center text-lg font-bold mb-4">
+
+        {/* PRIKAZ IMENA EKIPA */}
+        <div className="flex justify-between items-center text-xl font-bold mb-6">
           <span>{homeTeam}</span>
           <span>{awayTeam}</span>
         </div>
 
+        {/* REZULTAT + GUMBI */}
         <div className="grid grid-cols-3 gap-4 items-center text-center">
-          <button
-            onClick={() => setHomeGoals((v) => Math.max(0, v - 1))}
-            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
-          >
-            –
-          </button>
 
-          <div className="text-4xl font-bold">
-            {homeGoals}:{awayGoals}
-          </div>
-
+          {/* HOME + */}
           <button
             onClick={() => setHomeGoals((v) => v + 1)}
             className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
@@ -114,8 +113,22 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
             +
           </button>
 
+          {/* REZULTAT */}
+          <div className="text-4xl font-bold">
+            {homeGoals}:{awayGoals}
+          </div>
+
+          {/* AWAY + */}
           <button
-            onClick={() => setAwayGoals((v) => Math.max(0, v - 1))}
+            onClick={() => setAwayGoals((v) => v + 1)}
+            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
+          >
+            +
+          </button>
+
+          {/* HOME - */}
+          <button
+            onClick={() => setHomeGoals((v) => Math.max(0, v - 1))}
             className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
           >
             –
@@ -123,11 +136,12 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
 
           <div></div>
 
+          {/* AWAY - */}
           <button
-            onClick={() => setAwayGoals((v) => v + 1)}
+            onClick={() => setAwayGoals((v) => Math.max(0, v - 1))}
             className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
           >
-            +
+            –
           </button>
         </div>
       </div>
