@@ -8,8 +8,7 @@ export async function GET() {
       .storage
       .from("backups")
       .list("", {
-        limit: 100,
-        sortBy: { column: "created_at", order: "desc" },
+        limit: 100
       });
 
     if (error) {
@@ -20,11 +19,17 @@ export async function GET() {
     }
 
     const backups =
-      (data || []).map((item: any) => ({
-        name: item.name,
-        createdAt: item.created_at,
-        size: item.metadata?.size,
-      })) || [];
+      (data || [])
+        .map((item: any) => ({
+          name: item.name,
+          createdAt: item.created_at,
+          size: item.metadata?.size,
+        }))
+        .sort((a, b) => {
+          const da = new Date(a.createdAt).getTime();
+          const db = new Date(b.createdAt).getTime();
+          return db - da;
+        });
 
     return NextResponse.json({ backups });
   } catch (e) {
