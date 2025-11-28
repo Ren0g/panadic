@@ -151,7 +151,7 @@ export default function AdminPage() {
           Admin panel — Unos rezultata
         </h1>
 
-        {/* GUMBI — CENTRIRANI, JEDAN DO DRUGOG */}
+        {/* GUMBI — CENTRIRANI */}
         <div className="flex justify-center gap-4">
           <button
             onClick={() => (window.location.href = "/admin/live")}
@@ -381,6 +381,16 @@ export default function AdminPage() {
           )}
         </>
       )}
+
+      {/* ➤ LINK NA BACKUP PANEL — NA DNU DESNO */}
+      <div className="flex justify-end mt-10">
+        <button
+          onClick={() => (window.location.href = "/admin/backup")}
+          className="text-sm text-blue-600 underline hover:no-underline"
+        >
+          ➡️ Napredno: Backup sustav
+        </button>
+      </div>
     </div>
   );
 }
