@@ -34,7 +34,6 @@ const LEAGUE_LABELS: Record<string, string> = {
   POC_SILVER: "Početnici – Srebrna liga",
 };
 
-// LIVE window
 const LIVE_WINDOW_BEFORE_MS = 5 * 60 * 1000;
 const LIVE_WINDOW_AFTER_MS = 35 * 60 * 1000;
 
@@ -52,23 +51,18 @@ type CurrentMatch = {
 };
 
 export default function HomePage() {
-  const [selectedLeague, setSelectedLeague] = useState<LeagueCode | null>(null);
-  const [currentMatch, setCurrentMatch] = useState<CurrentMatch | null>(null);
+  const [selectedLeague, setSelectedLeague] =
+    useState<LeagueCode | null>(null);
+  const [currentMatch, setCurrentMatch] =
+    useState<CurrentMatch | null>(null);
   const [loadingMatch, setLoadingMatch] = useState(true);
 
   const currentLabel =
     LEAGUES.find((l) => l.code === selectedLeague)?.label ?? "";
 
-  // ---------------------------------------------------------
-  // LOAD CURRENT MATCH  + AUTO REFRESH every 10 seconds
-  // ---------------------------------------------------------
   useEffect(() => {
     loadMatch();
-
-    const interval = setInterval(() => {
-      loadMatch(); // auto refresh
-    }, 10000); // 10 sekundi
-
+    const interval = setInterval(() => loadMatch(), 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -92,7 +86,6 @@ export default function HomePage() {
       dt: new Date(`${f.match_date}T${f.match_time ?? "00:00"}`).getTime(),
     }));
 
-    // Live candidates
     const live = withDT.filter((f) => {
       const start = f.dt - LIVE_WINDOW_BEFORE_MS;
       const end = f.dt + LIVE_WINDOW_AFTER_MS;
@@ -103,9 +96,7 @@ export default function HomePage() {
     let status: "live" | "upcoming" = "upcoming";
 
     if (live.length > 0) {
-      live.sort(
-        (a, b) => Math.abs(a.dt - now) - Math.abs(b.dt - now)
-      );
+      live.sort((a, b) => Math.abs(a.dt - now) - Math.abs(b.dt - now));
       chosen = live[0];
       status = "live";
     } else {
@@ -113,16 +104,14 @@ export default function HomePage() {
         .filter((f) => f.dt > now)
         .sort((a, b) => a.dt - b.dt);
 
-      if (future.length > 0) {
-        chosen = future[0];
-      } else {
+      if (future.length > 0) chosen = future[0];
+      else {
         setCurrentMatch(null);
         setLoadingMatch(false);
         return;
       }
     }
 
-    // Load teams
     const { data: teams } = await supabase
       .from("teams")
       .select("id,name")
@@ -138,7 +127,6 @@ export default function HomePage() {
     const league_name =
       LEAGUE_LABELS[chosen.league_code] ?? chosen.league_code;
 
-    // Load result
     const { data: res } = await supabase
       .from("results")
       .select("home_goals, away_goals")
@@ -161,13 +149,20 @@ export default function HomePage() {
     setLoadingMatch(false);
   }
 
-  // ---------------------------------------------------------
-  // RENDER
-  // ---------------------------------------------------------
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 py-10 space-y-8">
+    <div className="w-full max-w-5xl mx-auto px-4 py-10 space-y-10">
 
-      {/* ---- LIVE / UPCOMING MATCH BANNER ---- */}
+      {/* HEADER DODAN */}
+      <div className="text-center mb-6">
+        <h1 className="text-3xl font-extrabold text-[#0A5E2A]">
+          Malonogometna liga Panadić
+        </h1>
+        <p className="text-lg text-gray-700">
+          Sezona 2025/2026
+        </p>
+      </div>
+
+      {/* ---- LIVE BANNER ---- */}
       <div className="bg-white rounded-xl border border-[#d9cbb1] shadow p-5">
         {loadingMatch ? (
           <div className="text-center text-gray-500 text-sm">
@@ -175,18 +170,15 @@ export default function HomePage() {
           </div>
         ) : !currentMatch ? (
           <div className="text-center text-gray-500 text-sm">
-            Trenutno nema utakmica u rasporedu.
+            Trenutno nema utakmica.
           </div>
         ) : (
           <div className="space-y-3">
 
-            {/* status */}
             <div className="flex justify-between text-xs font-semibold text-[#0A5E2A]">
-
               <span className="flex items-center gap-2">
                 {currentMatch.status === "live" ? (
                   <>
-                    {/* BLINKA CRVENA TOČKA */}
                     <span className="w-3 h-3 rounded-full bg-red-600 animate-pulse"></span>
                     U TIJEKU
                   </>
@@ -200,19 +192,19 @@ export default function HomePage() {
               </span>
             </div>
 
-            {/* teams */}
             <div className="text-center">
               <div className="text-xl font-bold text-[#0A5E2A]">
                 {currentMatch.home_team} — {currentMatch.away_team}
               </div>
               <div className="text-gray-600 text-sm">
-                {new Date(currentMatch.match_date).toLocaleDateString("hr-HR")}{" "}
+                {new Date(currentMatch.match_date).toLocaleDateString(
+                  "hr-HR"
+                )}{" "}
                 {currentMatch.match_time &&
                   `u ${currentMatch.match_time.substring(0, 5)}`}
               </div>
             </div>
 
-            {/* score */}
             <div className="flex justify-center">
               {currentMatch.home_goals !== null &&
               currentMatch.away_goals !== null ? (
@@ -225,12 +217,11 @@ export default function HomePage() {
                 </div>
               )}
             </div>
-
           </div>
         )}
       </div>
 
-      {/* ---- LEAGUE SELECTOR ---- */}
+      {/* SELECTOR */}
       <div className="flex justify-center">
         <LeagueSelector
           leagues={LEAGUES}
@@ -239,7 +230,7 @@ export default function HomePage() {
         />
       </div>
 
-      {/* ---- MESSAGE ---- */}
+      {/* No league selected */}
       {!selectedLeague && (
         <div className="rounded-xl border border-[#d9cbb1] bg-white px-6 py-8 text-center shadow max-w-xl mx-auto">
           <p className="text-lg font-medium mb-2">Odaberi ligu iz izbornika.</p>
@@ -249,7 +240,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ---- LEAGUE VIEW ---- */}
+      {/* LEAGUE VIEW */}
       {selectedLeague && (
         <div className="w-full mt-6">
           <h2 className="text-2xl font-semibold mb-4 text-[#0b5b2a] text-center">
