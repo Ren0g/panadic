@@ -4,27 +4,20 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
-type ResultRow = {
-  id: number;
-  fixture_id: number;
-  home_goals: number;
-  away_goals: number;
-};
-
 export default function LiveMatch({ params }: { params: { id: string } }) {
   const router = useRouter();
-
   const fixtureId = Number(params.id);
+
   const [homeTeam, setHomeTeam] = useState("");
   const [awayTeam, setAwayTeam] = useState("");
   const [homeGoals, setHomeGoals] = useState(0);
   const [awayGoals, setAwayGoals] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!Number.isFinite(fixtureId) || fixtureId <= 0) {
-      console.error("Neispravan fixtureId u URL-u:", params.id);
+    if (!fixtureId || !Number.isFinite(fixtureId)) {
+      setError("Neispravan fixture ID.");
       setLoading(false);
       return;
     }
@@ -35,130 +28,82 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
   async function loadMatch() {
     setLoading(true);
 
-    // 1) Fixture
-    const { data: fixture, error: fixtureErr } = await supabase
+    const { data: fixture } = await supabase
       .from("fixtures")
       .select("*")
       .eq("id", fixtureId)
       .single();
 
-    if (fixtureErr || !fixture) {
-      console.error("Fixture load error:", fixtureErr);
+    if (!fixture) {
+      setError("Utakmica ne postoji.");
       setLoading(false);
       return;
     }
 
-    // 2) Timovi
-    const teamIds = [fixture.home_team_id, fixture.away_team_id];
+    const homeId = Number(fixture.home_team_id);
+    const awayId = Number(fixture.away_team_id);
 
-    const { data: teams, error: teamsErr } = await supabase
+    const { data: teams } = await supabase
       .from("teams")
-      .select("id, name")
-      .in("id", teamIds);
+      .select("id,name")
+      .in("id", [homeId, awayId]);
 
-    if (teamsErr) {
-      console.error("Teams load error:", teamsErr);
-    }
+    const home = teams?.find((t) => Number(t.id) === homeId)?.name;
+    const away = teams?.find((t) => Number(t.id) === awayId)?.name;
 
-    const home =
-      teams?.find((t) => Number(t.id) === Number(fixture.home_team_id))
-        ?.name ?? "Nepoznato";
-    const away =
-      teams?.find((t) => Number(t.id) === Number(fixture.away_team_id))
-        ?.name ?? "Nepoznato";
+    setHomeTeam(home ?? "Nepoznato");
+    setAwayTeam(away ?? "Nepoznato");
 
-    setHomeTeam(home);
-    setAwayTeam(away);
-
-    // 3) Postojeći rezultat
-    const { data: resRows, error: resErr } = await supabase
+    const { data: results } = await supabase
       .from("results")
-      .select("id, fixture_id, home_goals, away_goals")
+      .select("*")
       .eq("fixture_id", fixtureId)
       .limit(1);
 
-    if (resErr) {
-      console.error("Results load error:", resErr);
-    }
-
-    if (resRows && resRows.length > 0) {
-      const r = resRows[0] as ResultRow;
-      setHomeGoals(r.home_goals ?? 0);
-      setAwayGoals(r.away_goals ?? 0);
-    } else {
-      setHomeGoals(0);
-      setAwayGoals(0);
+    if (results && results.length > 0) {
+      setHomeGoals(results[0].home_goals);
+      setAwayGoals(results[0].away_goals);
     }
 
     setLoading(false);
   }
 
   async function save() {
-    setSaveError(null);
-
-    if (!Number.isFinite(fixtureId) || fixtureId <= 0) {
-      setSaveError("Neispravan fixture ID, ne mogu spremiti rezultat.");
+    if (!fixtureId) {
+      setError("Neispravan fixture ID, ne mogu spremiti.");
       return;
     }
 
-    // Provjeri postoji li već rezultat
-    const { data: existingRows, error: checkErr } = await supabase
+    const { data: existing } = await supabase
       .from("results")
       .select("id")
       .eq("fixture_id", fixtureId)
       .limit(1);
 
-    if (checkErr) {
-      console.error("Check results error:", checkErr);
-      setSaveError("Greška pri provjeri postojećeg rezultata.");
-      return;
-    }
-
-    if (existingRows && existingRows.length > 0) {
-      // UPDATE
-      const existingId = existingRows[0].id as number;
-
-      const { error: updErr } = await supabase
+    if (existing && existing.length > 0) {
+      await supabase
         .from("results")
         .update({
           home_goals: homeGoals,
           away_goals: awayGoals,
         })
-        .eq("id", existingId);
-
-      if (updErr) {
-        console.error("Update error:", updErr);
-        setSaveError("Greška pri spremanju rezultata.");
-        return;
-      }
+        .eq("id", existing[0].id);
     } else {
-      // INSERT
-      const { error: insErr } = await supabase.from("results").insert({
+      await supabase.from("results").insert({
         fixture_id: fixtureId,
         home_goals: homeGoals,
         away_goals: awayGoals,
       });
-
-      if (insErr) {
-        console.error("Insert error:", insErr);
-        setSaveError("Greška pri spremanju rezultata.");
-        return;
-      }
     }
 
     router.push("/admin/live");
   }
 
-  if (loading) {
-    return (
-      <div className="p-4 text-center text-lg text-[#0A5E2A]">
-        Učitavanje...
-      </div>
-    );
-  }
+  if (loading) return <div className="p-4">Učitavanje...</div>;
 
   return (
     <div className="max-w-md mx-auto p-6 space-y-6">
+
       <button
         onClick={() => router.push("/admin/live")}
         className="px-4 py-2 bg-[#f7f1e6] border border-[#c8b59a] rounded-full text-[#0A5E2A] shadow"
@@ -170,6 +115,10 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
         LIVE rezultat
       </h1>
 
+      {error && (
+        <div className="text-red-600 text-center mb-4">{error}</div>
+      )}
+
       <div className="bg-[#f7f1e6] p-4 rounded-xl border border-[#c8b59a]">
         <div className="flex justify-between items-center text-xl font-bold mb-6">
           <span>{homeTeam}</span>
@@ -177,54 +126,45 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
         </div>
 
         <div className="grid grid-cols-3 gap-4 items-center text-center">
-          {/* HOME + */}
           <button
             onClick={() => setHomeGoals((v) => v + 1)}
-            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
+            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow"
           >
             +
           </button>
 
-          {/* SCORE */}
           <div className="text-4xl font-bold">
             {homeGoals}:{awayGoals}
           </div>
 
-          {/* AWAY + */}
           <button
             onClick={() => setAwayGoals((v) => v + 1)}
-            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
+            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow"
           >
             +
           </button>
 
-          {/* HOME - */}
           <button
             onClick={() => setHomeGoals((v) => Math.max(0, v - 1))}
-            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
+            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow"
           >
             –
           </button>
 
           <div></div>
 
-          {/* AWAY - */}
           <button
             onClick={() => setAwayGoals((v) => Math.max(0, v - 1))}
-            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
+            className="text-4xl font-bold bg-white border rounded-lg py-4 shadow"
           >
             –
           </button>
         </div>
       </div>
 
-      {saveError && (
-        <div className="text-sm text-red-600 text-center">{saveError}</div>
-      )}
-
       <button
         onClick={save}
-        className="w-full bg-[#0A5E2A] text-white py-3 rounded-xl shadow text-lg active:scale-95"
+        className="w-full bg-[#0A5E2A] text-white py-3 rounded-xl shadow text-lg"
       >
         Spremi rezultat
       </button>
