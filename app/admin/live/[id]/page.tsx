@@ -33,19 +33,22 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
       return;
     }
 
-    // 2) Učitaj timove
+    // 2) Ucitaj timove – popravak: ID pretvaramo u string
     const { data: teams } = await supabase
       .from("teams")
       .select("id, name")
-      .in("id", [fixture.home_team_id, fixture.away_team_id]);
+      .in("id", [
+        String(fixture.home_team_id),
+        String(fixture.away_team_id)
+      ]);
 
-    const home = teams?.find((t) => t.id === fixture.home_team_id);
-    const away = teams?.find((t) => t.id === fixture.away_team_id);
+    const home = teams?.find((t) => String(t.id) === String(fixture.home_team_id));
+    const away = teams?.find((t) => String(t.id) === String(fixture.away_team_id));
 
-    setHomeTeam(home?.name ?? "");
-    setAwayTeam(away?.name ?? "");
+    setHomeTeam(home?.name ?? "—");
+    setAwayTeam(away?.name ?? "—");
 
-    // 3) Postojeći rezultat
+    // 3) Postojeci rezultat
     const { data: results } = await supabase
       .from("results")
       .select("*")
@@ -75,7 +78,6 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
 
   return (
     <div className="max-w-md mx-auto p-6 space-y-6">
-      {/* Natrag */}
       <button
         onClick={() => router.push("/admin/live")}
         className="px-4 py-2 bg-[#f7f1e6] border border-[#c8b59a] rounded-full text-[#0A5E2A] shadow"
@@ -83,19 +85,16 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
         ← Natrag
       </button>
 
-      {/* Naslov */}
       <h1 className="text-2xl font-bold text-center text-[#0A5E2A]">
         LIVE rezultat
       </h1>
 
-      {/* Kartica utakmice */}
       <div className="bg-[#f7f1e6] p-4 rounded-xl border border-[#c8b59a]">
         <div className="flex justify-between items-center text-lg font-bold mb-4">
           <span>{homeTeam}</span>
           <span>{awayTeam}</span>
         </div>
 
-        {/* Gumbi */}
         <div className="grid grid-cols-3 gap-4 items-center text-center">
           <button
             onClick={() => setHomeGoals((v) => Math.max(0, v - 1))}
@@ -133,7 +132,6 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
         </div>
       </div>
 
-      {/* Spremi */}
       <button
         onClick={save}
         className="w-full bg-[#0A5E2A] text-white py-3 rounded-xl shadow text-lg active:scale-95"
