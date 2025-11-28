@@ -71,7 +71,6 @@ export default function AdminPage() {
     const hg = home === "" ? null : Number(home);
     const ag = away === "" ? null : Number(away);
 
-    // već postoji?
     const { data: existing } = await supabase
       .from("results")
       .select("*")
@@ -93,8 +92,7 @@ export default function AdminPage() {
       await recalculateStandings(LEAGUE_DB_CODE[league] as any);
     }
 
-    // refresh
-    loadFixtures(league);
+    if (league) loadFixtures(league);
   }
 
   async function deleteResult(fixtureId: number) {
@@ -104,10 +102,9 @@ export default function AdminPage() {
       await recalculateStandings(LEAGUE_DB_CODE[league] as any);
     }
 
-    loadFixtures(league);
+    if (league) loadFixtures(league);
   }
 
-  // jednostavna zaštita
   function tryLogin() {
     if (password === "panadic2025") setAuthorized(true);
     else alert("Pogrešna lozinka");
@@ -141,16 +138,15 @@ export default function AdminPage() {
         Admin panel — Unos rezultata
       </h1>
 
-      {/* IZBOR LIGE */}
       <div className="bg-[#f7f1e6] p-4 rounded-xl border border-[#c8b59a]">
         <label className="font-semibold text-[#0A5E2A]">Odaberi ligu:</label>
 
         <select
           value={league}
           onChange={(e) => {
-            const val = e.target.value as LeagueCode;
+            const val = e.target.value as LeagueCode | "";
             setLeague(val);
-            loadFixtures(val);
+            if (val !== "") loadFixtures(val);
           }}
           className="ml-4 px-3 py-2 border rounded-lg"
         >
@@ -165,7 +161,6 @@ export default function AdminPage() {
         </select>
       </div>
 
-      {/* POPIS UTAKMICA */}
       {league && (
         <div className="space-y-6">
           {loading ? (
@@ -184,7 +179,6 @@ export default function AdminPage() {
                   {fx.match_date} u {fx.match_time?.substring(0, 5)}
                 </div>
 
-                {/* FORMA ZA REZULTAT */}
                 <div className="flex items-center gap-4">
                   <input
                     type="number"
@@ -195,7 +189,6 @@ export default function AdminPage() {
                       setFixtures([...fixtures]);
                     }}
                     className="w-16 text-center border rounded px-2 py-1"
-                    placeholder="Dom"
                   />
 
                   <span className="font-bold text-lg">:</span>
@@ -209,7 +202,6 @@ export default function AdminPage() {
                       setFixtures([...fixtures]);
                     }}
                     className="w-16 text-center border rounded px-2 py-1"
-                    placeholder="Gos"
                   />
 
                   <button
