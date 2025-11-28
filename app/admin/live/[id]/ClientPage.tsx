@@ -16,6 +16,7 @@ export default function ClientPage({ fixtureId }: { fixtureId: string }) {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const [error, setError] = useState("");
+  const [leagueCode, setLeagueCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (!numericId || !Number.isFinite(numericId)) {
@@ -32,7 +33,7 @@ export default function ClientPage({ fixtureId }: { fixtureId: string }) {
 
     const { data: fixture } = await supabase
       .from("fixtures")
-      .select("*")
+      .select("id, home_team_id, away_team_id, league_code")
       .eq("id", numericId)
       .single();
 
@@ -41,6 +42,8 @@ export default function ClientPage({ fixtureId }: { fixtureId: string }) {
       setLoading(false);
       return;
     }
+
+    setLeagueCode(fixture.league_code ?? null);
 
     const homeId = Number(fixture.home_team_id);
     const awayId = Number(fixture.away_team_id);
@@ -101,10 +104,19 @@ export default function ClientPage({ fixtureId }: { fixtureId: string }) {
       });
     }
 
+    // 🔥 AUTOMATSKI REBUILD STANDINGS-a ZA LIGU OVOG FIXTURE-a
+    try {
+      await fetch(`/api/recalculate-standings?fixtureId=${numericId}`, {
+        method: "POST",
+      });
+    } catch (e) {
+      console.error("Greška kod recalculacije standingsa:", e);
+      // ne ruši UI, samo log
+    }
+
     setSaving(false);
     setSavedMsg("✔ Spremljeno!");
 
-    // Makni poruku nakon 2 sekunde
     setTimeout(() => setSavedMsg(""), 2000);
   }
 
