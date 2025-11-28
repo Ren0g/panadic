@@ -8,8 +8,7 @@ type Fixture = {
   id: string;
   round: number;
   match_date: string | null;
-  match_time_start: string | null;
-  match_time_end: string | null;
+  match_time: string | null;
   home_team: string;
   away_team: string;
   home_goals: number | null;
@@ -34,10 +33,7 @@ export default function ClientKola({ leagueCode }: { leagueCode: string }) {
         id,
         round,
         match_date,
-        match_time_start,
-        match_time_end,
-        home_team_id,
-        away_team_id,
+        match_time,
         home:home_team_id ( name ),
         away:away_team_id ( name ),
         results:results ( home_goals, away_goals )
@@ -63,8 +59,7 @@ export default function ClientKola({ leagueCode }: { leagueCode: string }) {
         id: f.id,
         round: f.round || 0,
         match_date: f.match_date,
-        match_time_start: f.match_time_start,
-        match_time_end: f.match_time_end,
+        match_time: f.match_time,
         home_team: homeRel?.name ?? "",
         away_team: awayRel?.name ?? "",
         home_goals: result ? result.home_goals : null,
@@ -78,7 +73,6 @@ export default function ClientKola({ leagueCode }: { leagueCode: string }) {
 
   if (loading) return <div>Učitavanje…</div>;
 
-  // grupiraj po kolu
   const grouped = fixtures.reduce((acc: any, f) => {
     if (!acc[f.round]) acc[f.round] = [];
     acc[f.round].push(f);
@@ -97,11 +91,6 @@ export default function ClientKola({ leagueCode }: { leagueCode: string }) {
 
             <div className="space-y-2">
               {grouped[round].map((m: Fixture) => {
-                const time =
-                  m.match_time_start && m.match_time_end
-                    ? `${m.match_time_start} - ${m.match_time_end}`
-                    : m.match_time_start || m.match_time_end || "";
-
                 const date = m.match_date
                   ? new Date(m.match_date).toLocaleDateString("hr-HR", {
                       day: "2-digit",
@@ -109,6 +98,10 @@ export default function ClientKola({ leagueCode }: { leagueCode: string }) {
                       year: "numeric",
                     })
                   : "-";
+
+                const time = m.match_time
+                  ? m.match_time.substring(0, 5)
+                  : "";
 
                 const hasResult =
                   m.home_goals !== null && m.away_goals !== null;
