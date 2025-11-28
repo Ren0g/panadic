@@ -60,6 +60,7 @@ export async function POST() {
       );
     }
 
+    // 2) Pripremi payload
     const now = new Date().toISOString();
 
     const payload: BackupPayload = {
@@ -75,23 +76,33 @@ export async function POST() {
 
     const jsonString = JSON.stringify(payload, null, 2);
 
+    // 3) Generiraj ime filea
     const safeName = `backup-${now.replace(/[:.]/g, "-")}.json`;
 
-    const { error: upErr } = await supabase
-      .storage
+    // 4) Pretvori JSON u Blob (OBAVEZNO - storage .upload NE PRIMA string!)
+    const fileData = new Blob([jsonString], {
+      type: "application/json",
+    });
+
+    // 5) Upload u Supabase Storage
+    const { error: upErr } = await supabase.storage
       .from("backups")
-      .upload(safeName, jsonString, {
+      .upload(safeName, fileData, {
         contentType: "application/json",
         upsert: false,
       });
 
     if (upErr) {
       return NextResponse.json(
-        { error: "Greška pri spremanju backupa u storage.", details: upErr },
+        {
+          error: "Greška pri spremanju backupa u storage.",
+          details: upErr,
+        },
         { status: 500 }
       );
     }
 
+    // 6) Gotovo
     return NextResponse.json({
       ok: true,
       backupName: safeName,
