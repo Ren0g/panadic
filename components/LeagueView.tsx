@@ -79,7 +79,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
 
       const dbLeagueCode = LEAGUE_DB_CODE[leagueCode];
 
-      // TEAMS – učitamo i is_placeholder
+      // TEAMS
       const { data: teams } = await supabase
         .from("teams")
         .select("id, name, is_placeholder");
@@ -92,17 +92,18 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         teamPlaceholderMap[t.id] = !!t.is_placeholder;
       });
 
-      // STANDINGS
+      // STANDINGS – SVA SLUŽBENA PANADIĆ PRAVILA
       const { data: rawStandings } = await supabase
         .from("standings")
         .select("*")
         .eq("league_code", dbLeagueCode)
         .order("bodovi", { ascending: false })
-        .order("gr", { ascending: false });
+        .order("gr", { ascending: false })
+        .order("gplus", { ascending: false })
+        .order("gminus", { ascending: true });
 
       const finalStandings =
         (rawStandings as Standing[] | null)
-          // makni sve placeholder timove (Pozicija 1, A1, B1...)
           ?.filter((s) => !teamPlaceholderMap[s.team_id])
           .map((s) => ({
             ...s,
@@ -135,7 +136,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
           };
         }) ?? [];
 
-      // Future fixtures
+      // FUTURE FIXTURES
       const futureFixtures = fixtures.filter((f) => f.fullDateTime > now);
 
       if (futureFixtures.length === 0) {
@@ -180,6 +181,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
 
   return (
     <div className="space-y-6">
+
       {/* TABLICA */}
       <div className="bg-[#f3ebd8] p-4 rounded-xl shadow border border-[#c8b59a] text-[#1a1a1a]">
         <h1 className="text-xl font-bold mb-4 text-[#0A5E2A]">
@@ -226,7 +228,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         </table>
       </div>
 
-      {/* SLJEDEĆE KOLO */}
+      {/* NEXT ROUND */}
       <div className="bg-[#0A5E2A] text-[#f7f1e6] p-4 rounded-xl shadow">
         <h2 className="text-lg font-semibold mb-4">
           {nextRoundNumber
