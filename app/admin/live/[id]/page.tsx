@@ -23,8 +23,16 @@ type ResultType = {
 };
 
 export default function LiveMatch({ params }: { params: { id: string } }) {
-  const fixtureId = Number(params.id);
+  const fixtureId = parseInt(params.id, 10);
   const router = useRouter();
+
+  if (!fixtureId || Number.isNaN(fixtureId)) {
+    return (
+      <div className="p-4 text-center text-red-600">
+        Neispravan ID utakmice.
+      </div>
+    );
+  }
 
   const [match, setMatch] = useState<FixtureType | null>(null);
   const [homeTeam, setHomeTeam] = useState<string>("");
@@ -40,7 +48,7 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
   async function loadMatch() {
     setLoading(true);
 
-    // 1) UČITAJ FIXTURE BEZ RELACIJA
+    // 1) UČITAJ FIXTURE
     const { data: fixture, error: fxErr } = await supabase
       .from("fixtures")
       .select("*")
@@ -55,7 +63,7 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
 
     setMatch(fixture);
 
-    // 2) UČITAJ IMENA TIMOVA
+    // 2) TIMOVI
     const { data: teams } = await supabase
       .from("teams")
       .select("id,name")
@@ -67,7 +75,7 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
     setHomeTeam(home?.name ?? "");
     setAwayTeam(away?.name ?? "");
 
-    // 3) UCITAJ REZULTAT
+    // 3) REZULTATI
     const { data: resultRows } = await supabase
       .from("results")
       .select("*")
