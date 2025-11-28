@@ -13,6 +13,8 @@ export default function ClientPage({ fixtureId }: { fixtureId: string }) {
   const [homeGoals, setHomeGoals] = useState(0);
   const [awayGoals, setAwayGoals] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -74,6 +76,9 @@ export default function ClientPage({ fixtureId }: { fixtureId: string }) {
       return;
     }
 
+    setSaving(true);
+    setSavedMsg("");
+
     const { data: existing } = await supabase
       .from("results")
       .select("id")
@@ -96,7 +101,11 @@ export default function ClientPage({ fixtureId }: { fixtureId: string }) {
       });
     }
 
-    // ❗ NE IDE VIŠE NIKAMO — ekran ostaje otvoren
+    setSaving(false);
+    setSavedMsg("✔ Spremljeno!");
+
+    // Makni poruku nakon 2 sekunde
+    setTimeout(() => setSavedMsg(""), 2000);
   }
 
   if (loading) return <div className="p-4">Učitavanje...</div>;
@@ -163,11 +172,20 @@ export default function ClientPage({ fixtureId }: { fixtureId: string }) {
       </div>
 
       <button
+        disabled={saving}
         onClick={save}
-        className="w-full bg-[#0A5E2A] text-white py-3 rounded-xl shadow text-lg"
+        className={`w-full py-3 rounded-xl shadow text-lg text-white ${
+          saving ? "bg-[#0A5E2A]/60" : "bg-[#0A5E2A]"
+        }`}
       >
-        Spremi rezultat
+        {saving ? "Spremam..." : "Spremi rezultat"}
       </button>
+
+      {savedMsg && (
+        <div className="text-center text-green-600 font-semibold">
+          {savedMsg}
+        </div>
+      )}
 
       <button
         onClick={() => router.push("/admin/live")}
