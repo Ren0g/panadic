@@ -4,6 +4,19 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
+type FixtureType = {
+  id: number;
+  match_date: string;
+  match_time: string;
+  home_team_id: number;
+  away_team_id: number;
+};
+
+type TeamType = {
+  id: number;
+  name: string;
+};
+
 type ResultType = {
   home_goals: number | null;
   away_goals: number | null;
@@ -13,7 +26,9 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
   const fixtureId = Number(params.id);
   const router = useRouter();
 
-  const [match, setMatch] = useState<any>(null);
+  const [match, setMatch] = useState<FixtureType | null>(null);
+  const [homeTeam, setHomeTeam] = useState<string>("");
+  const [awayTeam, setAwayTeam] = useState<string>("");
   const [homeGoals, setHomeGoals] = useState(0);
   const [awayGoals, setAwayGoals] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -25,41 +40,43 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
   async function loadMatch() {
     setLoading(true);
 
-    const { data, error } = await supabase
+    // 1) UČITAJ FIXTURE BEZ RELACIJA
+    const { data: fixture, error: fxErr } = await supabase
       .from("fixtures")
-      .select(
-        `
-        id,
-        match_date,
-        match_time,
-        home:home_team_id ( name ),
-        away:away_team_id ( name ),
-        results:results ( home_goals, away_goals )
-      `
-      )
+      .select("*")
       .eq("id", fixtureId)
       .single();
 
-    if (error || !data) {
-      console.error(error);
+    if (fxErr || !fixture) {
+      console.error(fxErr);
       setLoading(false);
       return;
     }
 
-    // FIX: relacije su array → uzmi prvi element
-    const homeRel = Array.isArray(data.home) ? data.home[0] : data.home;
-    const awayRel = Array.isArray(data.away) ? data.away[0] : data.away;
+    setMatch(fixture);
 
-    // FIX: osiguraj type ResultType
-    const result: ResultType = data.results?.[0] || {
+    // 2) UČITAJ IMENA TIMOVA
+    const { data: teams } = await supabase
+      .from("teams")
+      .select("id,name")
+      .in("id", [fixture.home_team_id, fixture.away_team_id]);
+
+    const home = teams?.find((t: TeamType) => t.id === fixture.home_team_id);
+    const away = teams?.find((t: TeamType) => t.id === fixture.away_team_id);
+
+    setHomeTeam(home?.name ?? "");
+    setAwayTeam(away?.name ?? "");
+
+    // 3) UCITAJ REZULTAT
+    const { data: resultRows } = await supabase
+      .from("results")
+      .select("*")
+      .eq("fixture_id", fixtureId);
+
+    const result: ResultType = resultRows?.[0] || {
       home_goals: 0,
       away_goals: 0,
     };
-
-    setMatch({
-      home_team: homeRel?.name ?? "",
-      away_team: awayRel?.name ?? "",
-    });
 
     setHomeGoals(result.home_goals ?? 0);
     setAwayGoals(result.away_goals ?? 0);
@@ -79,7 +96,8 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
     router.push("/admin/live");
   }
 
-  if (loading || !match) return <div className="p-4">Učitavanje...</div>;
+  if (loading || !match)
+    return <div className="p-4 text-center text-lg">Učitavanje...</div>;
 
   return (
     <div className="max-w-md mx-auto p-6 space-y-6">
@@ -97,14 +115,12 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
 
       <div className="bg-[#f7f1e6] p-4 rounded-xl border border-[#c8b59a]">
         <div className="flex justify-between items-center text-lg font-bold mb-4">
-          <span>{match.home_team}</span>
-          <span>{match.away_team}</span>
+          <span>{homeTeam}</span>
+          <span>{awayTeam}</span>
         </div>
 
-        {/* GRID ZA + / - GUMBE */}
         <div className="grid grid-cols-3 gap-4 items-center text-center">
 
-          {/* HOME - */}
           <button
             onClick={() => setHomeGoals((v) => Math.max(0, v - 1))}
             className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
@@ -112,10 +128,10 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
             –
           </button>
 
-          {/* REZULTAT */}
-          <div className="text-4xl font-bold">{homeGoals}:{awayGoals}</div>
+          <div className="text-4xl font-bold">
+            {homeGoals}:{awayGoals}
+          </div>
 
-          {/* HOME + */}
           <button
             onClick={() => setHomeGoals((v) => v + 1)}
             className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
@@ -123,7 +139,6 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
             +
           </button>
 
-          {/* AWAY - */}
           <button
             onClick={() => setAwayGoals((v) => Math.max(0, v - 1))}
             className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
@@ -133,7 +148,6 @@ export default function LiveMatch({ params }: { params: { id: string } }) {
 
           <div></div>
 
-          {/* AWAY + */}
           <button
             onClick={() => setAwayGoals((v) => v + 1)}
             className="text-4xl font-bold bg-white border rounded-lg py-4 shadow active:scale-95"
