@@ -94,8 +94,8 @@ export default function RootLayout({
             >
               © 2025 Promar.hr
             </a>
-            <a href="/admin" style="position:absolute; bottom:20px; right:20px; width:60px; height:60px; opacity:0;"> </a>
-          </div>
+            </div>
+          <a href="/admin" style="position:absolute; bottom:20px; right:20px; width:60px; height:60px; opacity:0;"> </a>
         </footer>
       </body>
     </html>
