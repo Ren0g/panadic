@@ -1,32 +1,44 @@
 import "./globals.css";
 import Image from "next/image";
+import type { Metadata } from "next";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Malonogometna liga Panadić 2025/2026",
   description: "Zimska liga Panadić 2025/2026",
-  manifest: "/manifest.webmanifest",
+
+  // OVO JE BITNO: manifest se zove manifest.json i živi u /public
+  manifest: "/manifest.json",
+
   themeColor: "#0b5b2a",
+
+  icons: {
+    // favicon / tab ikona
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    // iOS ikona za dodavanje na Home Screen
+    apple: [
+      {
+        url: "/icons/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
+  },
 };
 
-export default function Layout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
     <html lang="hr">
-      <head>
-        {/* PWA ICONS */}
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-        <link rel="icon" href="/favicon.ico" />
-      </head>
-
       <body className="min-h-screen bg-[#f7f1e6] flex flex-col">
-
         {/* HEADER */}
         <header className="w-full bg-[#0b5b2a] text-[#f7f1e6] shadow cursor-default">
           <div className="w-full text-center py-4 leading-tight">
-
             {/* RED 1 */}
             <div className="text-xl sm:text-2xl font-semibold">
               Malonogometna liga Panadić
@@ -41,9 +53,7 @@ export default function Layout({
 
         {/* CONTENT */}
         <main className="flex-1 w-full flex justify-center">
-          <div className="w-full max-w-3xl px-4 py-6">
-            {children}
-          </div>
+          <div className="w-full max-w-3xl px-4 py-6">{children}</div>
         </main>
 
         {/* FOOTER */}
@@ -66,19 +76,6 @@ export default function Layout({
             </a>
           </div>
         </footer>
-
-        {/* REGISTER SW */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ("serviceWorker" in navigator) {
-                window.addEventListener("load", function () {
-                  navigator.serviceWorker.register("/sw.js");
-                });
-              }
-            `,
-          }}
-        />
       </body>
     </html>
   );
