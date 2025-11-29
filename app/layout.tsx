@@ -1,14 +1,14 @@
 import "./globals.css";
 import Image from "next/image";
-import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 export const metadata = {
   title: "Malonogometna liga Panadić 2025/2026",
   description: "Zimska liga Panadić 2025/2026",
-  manifest: "/manifest.webmanifest"
+  manifest: "/manifest.webmanifest",
+  themeColor: "#0b5b2a",
 };
 
-export default function RootLayout({
+export default function Layout({
   children,
 }: {
   children: React.ReactNode;
@@ -16,24 +16,23 @@ export default function RootLayout({
   return (
     <html lang="hr">
       <head>
-        {/* PWA manifest */}
-        <link rel="manifest" href="/manifest.webmanifest" />
-        {/* Boja address bara na mobitelu */}
-        <meta name="theme-color" content="#0b5b2a" />
-        {/* iOS ikona */}
-        <link rel="apple-touch-icon" href="/icons/icon-180.png" />
+        {/* PWA ICONS */}
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="icon" href="/favicon.ico" />
       </head>
 
       <body className="min-h-screen bg-[#f7f1e6] flex flex-col">
-        {/* registracija service workera */}
-        <ServiceWorkerRegister />
 
         {/* HEADER */}
-        <header className="w-full bg-[#0b5b2a] text-[#f7f1e6] shadow">
+        <header className="w-full bg-[#0b5b2a] text-[#f7f1e6] shadow cursor-default">
           <div className="w-full text-center py-4 leading-tight">
+
+            {/* RED 1 */}
             <div className="text-xl sm:text-2xl font-semibold">
               Malonogometna liga Panadić
             </div>
+
+            {/* RED 2 */}
             <div className="text-sm sm:text-base opacity-90">
               Sezona 2025/2026
             </div>
@@ -61,12 +60,25 @@ export default function RootLayout({
               href="https://promar.hr"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm hover:underline"
+              className="text-sm hover:underline cursor-pointer"
             >
               © 2025 Promar.hr
             </a>
           </div>
         </footer>
+
+        {/* REGISTER SW */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ("serviceWorker" in navigator) {
+                window.addEventListener("load", function () {
+                  navigator.serviceWorker.register("/sw.js");
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );
