@@ -1,9 +1,11 @@
 import "./globals.css";
 import Image from "next/image";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 export const metadata = {
   title: "Malonogometna liga Panadić 2025/2026",
   description: "Zimska liga Panadić 2025/2026",
+  manifest: "/manifest.webmanifest"
 };
 
 export default function RootLayout({
@@ -13,22 +15,28 @@ export default function RootLayout({
 }) {
   return (
     <html lang="hr">
+      <head>
+        {/* PWA manifest */}
+        <link rel="manifest" href="/manifest.webmanifest" />
+        {/* Boja address bara na mobitelu */}
+        <meta name="theme-color" content="#0b5b2a" />
+        {/* iOS ikona */}
+        <link rel="apple-touch-icon" href="/icons/icon-180.png" />
+      </head>
+
       <body className="min-h-screen bg-[#f7f1e6] flex flex-col">
+        {/* registracija service workera */}
+        <ServiceWorkerRegister />
 
         {/* HEADER */}
-        <header className="w-full bg-[#0b5b2a] text-[#f7f1e6] shadow cursor-default">
+        <header className="w-full bg-[#0b5b2a] text-[#f7f1e6] shadow">
           <div className="w-full text-center py-4 leading-tight">
-
-            {/* RED 1 */}
             <div className="text-xl sm:text-2xl font-semibold">
               Malonogometna liga Panadić
             </div>
-
-            {/* RED 2 */}
             <div className="text-sm sm:text-base opacity-90">
               Sezona 2025/2026
             </div>
-
           </div>
         </header>
 
@@ -53,13 +61,12 @@ export default function RootLayout({
               href="https://promar.hr"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm hover:underline cursor-pointer"
+              className="text-sm hover:underline"
             >
               © 2025 Promar.hr
             </a>
           </div>
         </footer>
-
       </body>
     </html>
   );
