@@ -1,6 +1,7 @@
 import "./globals.css";
 import Image from "next/image";
 import type { Metadata } from "next";
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "Malonogometna liga Panadić 2025/2026",
@@ -35,6 +36,25 @@ export default function RootLayout({
 }) {
   return (
     <html lang="hr">
+      <head>
+        {/* Google Analytics 4 */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-06H9DPCEQZ"
+          strategy="afterInteractive"
+        />
+        <Script id="ga4" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+
+            gtag('config', 'G-06H9DPCEQZ', {
+              page_path: window.location.pathname,
+            });
+          `}
+        </Script>
+      </head>
+
       <body className="min-h-screen bg-[#f7f1e6] flex flex-col">
         {/* HEADER */}
         <header className="w-full bg-[#0b5b2a] text-[#f7f1e6] shadow cursor-default">
