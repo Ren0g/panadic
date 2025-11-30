@@ -147,6 +147,7 @@ export default function AdminPage() {
   // MAIN ADMIN PANEL
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
+
       <div className="text-center space-y-4">
         <h1 className="text-2xl font-bold text-[#0A5E2A]">
           Admin panel — Unos rezultata
@@ -385,11 +386,12 @@ export default function AdminPage() {
       <div className="flex justify-end mt-10">
         <button
           onClick={() => {
-            window.open("/api/report", "_blank");
+            // automatski print pdf
+            window.open("/api/report?print=1", "_blank");
           }}
           className="px-4 py-2 text-white rounded-full cursor-pointer bg-[#0A5E2A] hover:bg-[#08471f] shadow mr-4"
         >
-          📄 Otvori izvještaj (HTML / PDF)
+          📄 Generiraj PDF izvještaj
         </button>
 
         <button
