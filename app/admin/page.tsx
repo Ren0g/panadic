@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-// ✅ NOVI IMPORT – umjesto recalculateStandings
 import { recalculateStandingsForFixture } from "@/lib/recalculateStandings";
 
 type LeagueCode =
@@ -34,7 +33,6 @@ export default function AdminPage() {
   const [nextRound, setNextRound] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // ⛔ ENTER LOGIN ENABLED
   function tryLogin(e: any) {
     e.preventDefault();
     if (password === "panadic2025") setAuthorized(true);
@@ -106,10 +104,6 @@ export default function AdminPage() {
         .insert({ fixture_id: fixtureId, home_goals: hg, away_goals: ag });
     }
 
-    // 🔁 STARO:
-    // if (league) await recalculateStandings(LEAGUE_DB_CODE[league] as any);
-
-    // ✅ NOVO: računaj standings prema KONKRETNOM fixture-u
     await recalculateStandingsForFixture(fixtureId);
 
     if (league) loadFixtures(league);
@@ -120,19 +114,12 @@ export default function AdminPage() {
     if (!yes) return;
 
     await supabase.from("results").delete().eq("fixture_id", fixtureId);
-
-    // 🔁 STARO:
-    // if (league) await recalculateStandings(LEAGUE_DB_CODE[league] as any);
-
-    // ✅ NOVO: opet prema fixture-u
     await recalculateStandingsForFixture(fixtureId);
 
     if (league) loadFixtures(league);
   }
 
-  // ---------------------
-  // LOGIN SCREEN
-  // ---------------------
+  // LOGIN
   if (!authorized) {
     return (
       <form
@@ -158,12 +145,9 @@ export default function AdminPage() {
     );
   }
 
-  // ---------------------
   // ADMIN PANEL
-  // ---------------------
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
-
       <div className="text-center space-y-4">
         <h1 className="text-2xl font-bold text-[#0A5E2A]">
           Admin panel — Unos rezultata
@@ -186,7 +170,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* ▼ LIGA SELECTOR */}
+      {/* -------- ODABIR LIGE -------- */}
       <div className="bg-[#f7f1e6] p-4 rounded-xl border border-[#c8b59a] text-center">
         <label className="font-semibold text-[#0A5E2A]">Odaberi ligu:</label>
 
@@ -210,7 +194,7 @@ export default function AdminPage() {
         </select>
       </div>
 
-      {/* ▼ VIEW BUTTONS */}
+      {/* -------- AKTUALNO / SVA KOLA -------- */}
       {league && (
         <div className="flex gap-4 justify-center">
           <button
@@ -237,13 +221,12 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ▼ LOADING */}
+      {/* -------- UČITAVANJE -------- */}
       {loading && <div>Učitavanje...</div>}
 
-      {/* ▼ FIXTURE UI */}
+      {/* -------- SVI FIXTUREI -------- */}
       {league && !loading && (
         <>
-          {/* ACTUAL ROUND */}
           {view === "CURRENT" && nextRound && (
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-[#0A5E2A] text-center">
@@ -313,7 +296,6 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ALL ROUNDS */}
           {view === "ALL" && (
             <div className="space-y-8">
               {Object.keys(
@@ -333,7 +315,7 @@ export default function AdminPage() {
                       {round}. kolo
                     </h2>
 
-                    {(fixtures || [])
+                    {fixtures
                       .filter((f) => f.round == Number(round))
                       .map((fx) => (
                         <div
@@ -400,8 +382,25 @@ export default function AdminPage() {
         </>
       )}
 
-      {/* ▼ BACKUP BUTTON — NARANČASTI */}
+      {/* -------- EXPORT GUMB -------- */}
       <div className="flex justify-end mt-10">
+        <button
+          onClick={async () => {
+            const res = await fetch("/api/export/word", { method: "POST" });
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "izvjestaj_2_kolo.docx";
+            a.click();
+          }}
+          className="px-4 py-2 text-white rounded-full cursor-pointer bg-[#0A5E2A] hover:bg-[#08471f] shadow mr-4"
+        >
+          📄 Generiraj izvještaj (Word)
+        </button>
+
         <button
           onClick={() => (window.location.href = "/admin/backup")}
           className="px-4 py-2 text-white rounded-full cursor-pointer bg-[#f37c22] hover:bg-[#d96d1c] shadow"
