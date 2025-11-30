@@ -5,7 +5,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// SAMO 5 LIGA — GOLD i SILVER uklonjeni
+// SAMO REGULARNE LIGE – bez Zlatne i Srebrne
 const LEAGUES = [
   { db: "PIONIRI_REG", label: "Pioniri" },
   { db: "MLPIONIRI_REG", label: "Mlađi pioniri" },
@@ -40,13 +40,26 @@ type StandingRow = {
   group_code: string | null;
 };
 
-function shortTime(t: string | null): string {
+// HR DATUM – iz "2025-12-06" u "06.12.2025."
+function hrDate(str: string | null): string {
+  if (!str) return "";
+  const parts = str.split("-");
+  if (parts.length !== 3) return str;
+  const [y, m, d] = parts;
+  return `${d}.${m}.${y}.`;
+}
+
+// HR VRIJEME – "17:18:00" -> "17:18"
+function hrTime(t: string | null): string {
   if (!t) return "";
   if (t.length >= 5) return t.slice(0, 5);
   return t;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const print = url.searchParams.get("print") === "1";
+
   const [
     { data: teamsData, error: teamsError },
     { data: fixturesRaw, error: fixturesError },
@@ -73,13 +86,22 @@ export async function GET() {
     supabase.from("standings").select("*"),
   ]);
 
-  if (!teamsData || !fixturesRaw || !standingsData || teamsError || fixturesError || standingsError) {
+  if (
+    !teamsData ||
+    !fixturesRaw ||
+    !standingsData ||
+    teamsError ||
+    fixturesError ||
+    standingsError
+  ) {
     console.error("Greška pri dohvaćanju podataka:", {
       teamsError,
       fixturesError,
       standingsError,
     });
-    return new NextResponse("Greška pri dohvaćanju podataka iz Supabase-a", { status: 500 });
+    return new NextResponse("Greška pri dohvaćanju podataka iz Supabase-a", {
+      status: 500,
+    });
   }
 
   const fixtures: FixtureRow[] = fixturesRaw as any;
@@ -89,6 +111,8 @@ export async function GET() {
   teamsData.forEach((t: any) => {
     teamName.set(t.id, t.name);
   });
+
+  // --- odredi zadnje odigrano kolo ---
 
   const fixturesWithResult = fixtures.filter(
     (f) =>
@@ -106,9 +130,10 @@ export async function GET() {
 
   const nextRound = lastRound + 1;
 
-  // --- HTML builder helperi ---
-  function esc(str: any) {
-    return String(str)
+  // --- HTML helperi ---
+
+  function esc(str: string) {
+    return str
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
@@ -130,16 +155,19 @@ export async function GET() {
 
     const rows = fxRound
       .map((f, idx) => {
-        const res = f.results && f.results[0];
+        const res =
+          f.results && f.results.length > 0 ? f.results[0] : null;
+
         const score =
           res && res.home_goals !== null && res.away_goals !== null
             ? `${res.home_goals}:${res.away_goals}`
             : "-:-";
 
+        const cls = idx % 2 === 1 ? 'class="shaded"' : "";
         return `
-        <tr class="${idx % 2 === 1 ? "shaded" : ""}">
-          <td>${esc(teamName.get(f.home_team_id))}</td>
-          <td>${esc(teamName.get(f.away_team_id))}</td>
+        <tr ${cls}>
+          <td class="left">${esc(teamName.get(f.home_team_id) || String(f.home_team_id))}</td>
+          <td class="left">${esc(teamName.get(f.away_team_id) || String(f.away_team_id))}</td>
           <td class="center">${esc(score)}</td>
         </tr>`;
       })
@@ -154,7 +182,9 @@ export async function GET() {
             <th class="center">Rezultat</th>
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>
+          ${rows}
+        </tbody>
       </table>
     `;
   }
@@ -179,9 +209,11 @@ export async function GET() {
 
     const rows = enriched
       .map((s, idx) => {
+        const cls = idx % 2 === 1 ? 'class="shaded"' : "";
+        const rank = idx + 1;
         return `
-        <tr class="${idx % 2 === 1 ? "shaded" : ""}">
-          <td class="center">${idx + 1}</td>
+        <tr ${cls}>
+          <td class="center">${rank}</td>
           <td class="left">${esc(s.name)}</td>
           <td class="center">${s.ut}</td>
           <td class="center">${s.p}</td>
@@ -211,7 +243,9 @@ export async function GET() {
             <th>Bodovi</th>
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>
+          ${rows}
+        </tbody>
       </table>
     `;
   }
@@ -232,12 +266,13 @@ export async function GET() {
 
     const rows = fxNext
       .map((f, idx) => {
+        const cls = idx % 2 === 1 ? 'class="shaded"' : "";
         return `
-        <tr class="${idx % 2 === 1 ? "shaded" : ""}">
-          <td>${esc(f.match_date)}</td>
-          <td class="center">${esc(shortTime(f.match_time))}</td>
-          <td class="left">${esc(teamName.get(f.home_team_id))}</td>
-          <td class="left">${esc(teamName.get(f.away_team_id))}</td>
+        <tr ${cls}>
+          <td>${esc(hrDate(f.match_date))}</td>
+          <td class="center">${esc(hrTime(f.match_time))}</td>
+          <td class="left">${esc(teamName.get(f.home_team_id) || String(f.home_team_id))}</td>
+          <td class="left">${esc(teamName.get(f.away_team_id) || String(f.away_team_id))}</td>
         </tr>`;
       })
       .join("");
@@ -252,7 +287,9 @@ export async function GET() {
             <th>Gost</th>
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>
+          ${rows}
+        </tbody>
       </table>
     `;
   }
@@ -274,48 +311,129 @@ export async function GET() {
     `;
   }).join("");
 
+  const title = `izvjestaj_kolo_${lastRound}`;
+
+  const autoPrintScript = print
+    ? `<script>
+         window.onload = function() { window.print(); };
+       </script>`
+    : "";
+
   const html = `
 <!DOCTYPE html>
 <html lang="hr">
 <head>
   <meta charset="UTF-8" />
-  <title>Izvještaj nakon ${lastRound}. kola — Panadić 2025/26</title>
+  <title>${title}</title>
+  <meta name="file-name" content="${title}.pdf" />
   <style>
-    body { font-family: system-ui; margin: 40px; color:#222; }
-    h1 { text-align:center; color:#0A5E2A; margin-bottom:8px; }
-    h2 { text-align:center; color:#0A5E2A; margin-top:40px; }
-    h3 { color:#0A5E2A; margin-top:20px; }
-    .subtitle { text-align:center; color:#F37C22; margin-bottom:30px; }
-    table { width:100%; border-collapse:collapse; margin-bottom:18px; font-size:12px; }
-    th,td { padding:4px 6px; }
-    th { background:#FFF0E6; color:#F37C22; border-bottom:1px solid #e0d4c5; }
-    .header { background:#FFF0E6; }
-    .shaded { background:#FFF8F2; }
-    .center { text-align:center; }
-    .left   { text-align:left; }
-    footer td { text-align:center; padding-top:20px; color:#F37C22; font-size:11px; }
-    .league-section { page-break-after:always; }
-    .league-section:last-of-type { page-break-after:auto; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 40px;
+      color: #222;
+    }
+    h1 {
+      text-align: center;
+      color: #0A5E2A;
+      margin-bottom: 8px;
+    }
+    h2 {
+      text-align: center;
+      color: #0A5E2A;
+      margin-top: 40px;
+      margin-bottom: 10px;
+    }
+    h3 {
+      color: #0A5E2A;
+      margin-top: 20px;
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #F37C22;
+      margin-bottom: 30px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 18px;
+      font-size: 12px;
+    }
+    th, td {
+      padding: 4px 6px;
+    }
+    th {
+      background: #FFF0E6;
+      color: #F37C22;
+      border-bottom: 1px solid #e0d4c5;
+    }
+    .header {
+      background: #FFF0E6;
+    }
+    .shaded {
+      background: #FFF8F2;
+    }
+    .center {
+      text-align: center;
+    }
+    .left {
+      text-align: left;
+    }
+    tfoot td {
+      font-size: 10px;
+      text-align: center;
+      padding-top: 20px;
+      color: #F37C22;
+    }
+    .league-section {
+      page-break-after: always;
+    }
+    .league-section:last-of-type {
+      page-break-after: auto;
+    }
+
+    @media print {
+      body {
+        margin: 20mm;
+      }
+      footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+      }
+    }
   </style>
 </head>
 <body>
   <h1>Izvještaj nakon ${lastRound}. kola</h1>
   <div class="subtitle">malonogometne lige Panadić 2025/26</div>
 
-  <p style="text-align:center; font-size:11px; margin-bottom:40px; color:#555;">
+  <p style="text-align:center; font-size: 11px; margin-bottom: 40px; color:#555;">
     Automatski generiran izvještaj iz aplikacije <strong>panadic.vercel.app</strong>
   </p>
 
   ${leaguesHtml}
 
   <footer>
-    <table><tr><td>panadic.vercel.app</td></tr></table>
+    <table>
+      <tfoot>
+        <tr>
+          <td>panadic.vercel.app</td>
+        </tr>
+      </tfoot>
+    </table>
   </footer>
+
+  ${autoPrintScript}
 </body>
-</html>`;
+</html>
+`;
 
   return new NextResponse(html, {
     status: 200,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
   });
 }
