@@ -8,6 +8,14 @@ type BackupMeta = {
   size?: number;
 };
 
+type AuditRow = {
+  id: number;
+  table_name: string;
+  action: string;
+  row_id: number | null;
+  changed_at: string;
+};
+
 const BACKUP_PASSWORD = "Jan 1 Franko";
 
 export default function BackupPage() {
@@ -20,7 +28,14 @@ export default function BackupPage() {
   const [restoring, setRestoring] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // ENTER LOGIN ENABLED
+  // ▼ AUDIT LOG STATE
+  const [audit, setAudit] = useState<AuditRow[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditVisible, setAuditVisible] = useState(false);
+
+  // ---------------------------------
+  // LOGIN HANDLING
+  // ---------------------------------
   function tryLogin(e: any) {
     e.preventDefault();
     if (password === BACKUP_PASSWORD) {
@@ -31,14 +46,15 @@ export default function BackupPage() {
     }
   }
 
+  // ---------------------------------
+  // BACKUP LIST LOADING
+  // ---------------------------------
   async function loadBackups() {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/backup/list");
-      if (!res.ok) {
-        throw new Error("Ne mogu učitati popis backupova.");
-      }
+      if (!res.ok) throw new Error("Ne mogu učitati popis backupova.");
       const data = await res.json();
       setBackups(data.backups || []);
     } catch (e: any) {
@@ -49,25 +65,26 @@ export default function BackupPage() {
   }
 
   useEffect(() => {
-    if (authorized) {
-      loadBackups();
-    }
+    if (authorized) loadBackups();
   }, [authorized]);
 
+  // ---------------------------------
+  // CREATE BACKUP
+  // ---------------------------------
   async function handleCreateBackup() {
     const yes = confirm("Sigurno želiš napraviti novi backup svih liga?");
     if (!yes) return;
 
     setCreating(true);
     setError(null);
+
     try {
-      const res = await fetch("/api/backup/create", {
-        method: "POST",
-      });
+      const res = await fetch("/api/backup/create", { method: "POST" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Greška pri izradi backupa.");
       }
+
       await loadBackups();
       alert("Backup je uspješno napravljen.");
     } catch (e: any) {
@@ -77,6 +94,9 @@ export default function BackupPage() {
     }
   }
 
+  // ---------------------------------
+  // RESTORE
+  // ---------------------------------
   async function handleRestore(backupName: string) {
     const confirmFirst = confirm(
       `Želiš vratiti ligu(e) na stanje iz backupa:\n${backupName}?\n\nOva akcija će prebrisati postojeće podatke.`
@@ -90,12 +110,10 @@ export default function BackupPage() {
     if (!modeRaw) return;
 
     const modeTrimmed = modeRaw.trim().toUpperCase();
+    const payload: any = { backupName };
 
-    let payload: any = { backupName };
-
-    if (modeTrimmed === "SVE") {
-      payload.mode = "ALL";
-    } else {
+    if (modeTrimmed === "SVE") payload.mode = "ALL";
+    else {
       payload.mode = "ONE_LEAGUE";
       payload.leagueCode = modeTrimmed;
     }
@@ -112,15 +130,11 @@ export default function BackupPage() {
 
       const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
-        throw new Error(data.error || "Greška pri restore operaciji.");
-      }
+      if (!res.ok) throw new Error(data.error || "Greška pri restore operaciji.");
 
       alert(
         `Restore gotov.\nNačin: ${
-          payload.mode === "ALL"
-            ? "sve lige"
-            : `liga ${payload.leagueCode}`
+          payload.mode === "ALL" ? "sve lige" : `liga ${payload.leagueCode}`
         }`
       );
     } catch (e: any) {
@@ -130,6 +144,9 @@ export default function BackupPage() {
     }
   }
 
+  // ---------------------------------
+  // DELETE BACKUP
+  // ---------------------------------
   async function handleDelete(backupName: string) {
     const yes = confirm(
       `Stvarno želiš obrisati backup:\n${backupName}?\n\nOva radnja je trajna.`
@@ -147,9 +164,7 @@ export default function BackupPage() {
 
       const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
-        throw new Error(data.error || "Greška pri brisanju backupa.");
-      }
+      if (!res.ok) throw new Error(data.error || "Greška pri brisanju backupa.");
 
       await loadBackups();
     } catch (e: any) {
@@ -157,9 +172,36 @@ export default function BackupPage() {
     }
   }
 
+  // ---------------------------------
+  // DOWNLOAD
+  // ---------------------------------
   function handleDownload(backupName: string) {
     window.location.href =
       "/api/backup/download?name=" + encodeURIComponent(backupName);
+  }
+
+  // ---------------------------------
+  // LOAD AUDIT LOG
+  // ---------------------------------
+  async function loadAudit() {
+    setAuditLoading(true);
+    try {
+      const res = await fetch("/api/audit/list");
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Greška pri učitavanju audit loga");
+
+      setAudit(data.logs || []);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setAuditLoading(false);
+    }
+  }
+
+  function toggleAudit() {
+    if (!auditVisible) loadAudit();
+    setAuditVisible(!auditVisible);
   }
 
   // ---------------------------------
@@ -171,9 +213,7 @@ export default function BackupPage() {
         onSubmit={tryLogin}
         className="max-w-sm mx-auto mt-20 bg-white p-6 rounded-xl shadow border border-gray-300"
       >
-        <h1 className="text-xl font-semibold mb-4 text-center">
-          Backup login
-        </h1>
+        <h1 className="text-xl font-semibold mb-4 text-center">Backup login</h1>
 
         <input
           type="password"
@@ -183,9 +223,7 @@ export default function BackupPage() {
         />
 
         {error && (
-          <div className="text-red-600 text-sm mb-3 text-center">
-            {error}
-          </div>
+          <div className="text-red-600 text-sm mb-3 text-center">{error}</div>
         )}
 
         <button
@@ -202,7 +240,7 @@ export default function BackupPage() {
   // BACKUP PANEL
   // ---------------------------------
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="max-w-4xl mx-auto p-6 space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-[#0A5E2A]">
           Backup & Restore — Liga Panadić
@@ -216,6 +254,7 @@ export default function BackupPage() {
         </button>
       </div>
 
+      {/* BACKUP INFO BOX */}
       <div className="bg-[#f7f1e6] p-4 rounded-xl border border-[#c8b59a] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <div className="font-semibold text-[#0A5E2A]">Trenutno stanje:</div>
@@ -239,6 +278,7 @@ export default function BackupPage() {
         </div>
       )}
 
+      {/* BACKUP LIST */}
       <div className="bg-white rounded-xl border border-[#d9cbb1] shadow p-4">
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-lg font-semibold text-[#0A5E2A]">
@@ -302,6 +342,60 @@ export default function BackupPage() {
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* -------------------------------------- */}
+      {/*            🔶  AUDIT LOG               */}
+      {/* -------------------------------------- */}
+
+      <div className="bg-white rounded-xl border border-[#d9cbb1] shadow p-4">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-lg font-semibold text-[#0A5E2A]">
+            Audit log — aktivnosti u bazi
+          </h2>
+
+          <button
+            onClick={toggleAudit}
+            className="text-sm underline cursor-pointer"
+          >
+            {auditVisible ? "Sakrij" : "Prikaži"}
+          </button>
+        </div>
+
+        {auditVisible && (
+          <>
+            {auditLoading && (
+              <div className="text-gray-600 text-sm">Učitavam...</div>
+            )}
+
+            {!auditLoading && audit.length === 0 && (
+              <div className="text-gray-600 text-sm">
+                Nema zabilježenih aktivnosti.
+              </div>
+            )}
+
+            {!auditLoading && audit.length > 0 && (
+              <div className="space-y-2">
+                {audit.map((row) => (
+                  <div
+                    key={row.id}
+                    className="border-b py-2 text-sm text-gray-800"
+                  >
+                    <div>
+                      <strong>{row.action}</strong>{" "}
+                      <span className="text-gray-600">
+                        ({row.table_name}, ID: {row.row_id ?? "?"})
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {new Date(row.changed_at).toLocaleString("hr-HR")}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
