@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -17,27 +15,68 @@ const LEAGUES = [
   { db: "POC_SILVER", label: "Srebrna liga" },
 ];
 
+type FixtureRow = {
+  id: number;
+  league_code: string;
+  round: number;
+  match_date: string | null;
+  match_time: string | null;
+  home_team_id: number;
+  away_team_id: number;
+  results: { home_goals: number | null; away_goals: number | null }[] | null;
+};
+
+type StandingRow = {
+  league_code: string;
+  team_id: number;
+  ut: number;
+  p: number;
+  n: number;
+  i: number;
+  gplus: number;
+  gminus: number;
+  gr: number;
+  bodovi: number;
+  phase: string | null;
+  group_code: string | null;
+};
+
 function shortTime(t: string | null): string {
   if (!t) return "";
-  return t.slice(0, 5);
+  if (t.length >= 5) return t.slice(0, 5);
+  return t;
 }
 
-function esc(str: string | null): string {
-  if (!str) return "";
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+// sigurno escapiranje svega (string/number/null/undefined)
+function esc(value: string | number | null | undefined): string {
+  const str = value == null ? "" : String(value);
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// sigurno čitanje rezultata iz fixturea (može biti null, prazan array...)
+function safeResult(f: FixtureRow): {
+  home: number | null;
+  away: number | null;
+} {
+  const res = Array.isArray(f.results) && f.results.length > 0 ? f.results[0] : null;
+
+  return {
+    home: res?.home_goals ?? null,
+    away: res?.away_goals ?? null,
+  };
 }
 
 export async function GET() {
-  const [{ data: teams }, { data: fixtures }, { data: standings }] =
-    await Promise.all([
-      supabase.from("teams").select("id,name"),
-      supabase
-        .from("fixtures")
-        .select(
-          `
+  const [
+    { data: teamsData, error: teamsError },
+    { data: fixturesRaw, error: fixturesError },
+    { data: standingsData, error: standingsError },
+  ] = await Promise.all([
+    supabase.from("teams").select("id, name"),
+    supabase
+      .from("fixtures")
+      .select(
+        `
         id,
         league_code,
         round,
@@ -46,275 +85,321 @@ export async function GET() {
         home_team_id,
         away_team_id,
         results:results ( home_goals, away_goals )
-      `
-        )
-        .order("league_code")
-        .order("round")
-        .order("match_date"),
-      supabase.from("standings").select("*"),
-    ]);
+        `
+      )
+      .order("league_code")
+      .order("round")
+      .order("match_date"),
+    supabase.from("standings").select("*"),
+  ]);
 
-  if (!teams || !fixtures || !standings) {
-    return new NextResponse("Greška pri dohvaćanju podataka.", { status: 500 });
+  if (!teamsData || !fixturesRaw || !standingsData || teamsError || fixturesError || standingsError) {
+    console.error("Greška pri dohvaćanju podataka:", {
+      teamsError,
+      fixturesError,
+      standingsError,
+    });
+    return new NextResponse("Greška pri dohvaćanju podataka iz Supabase-a", { status: 500 });
   }
+
+  const fixtures: FixtureRow[] = fixturesRaw as any;
+  const standings: StandingRow[] = standingsData as any;
 
   const teamName = new Map<number, string>();
-  teams.forEach((t) => teamName.set(t.id, t.name));
-
-  // zadnje odigrano kolo
-  const played = fixtures.filter(
-    (f: any) =>
-      f.results &&
-      f.results.length &&
-      f.results[0].home_goals !== null &&
-      f.results[0].away_goals !== null
-  );
-
-  let lastRound = 0;
-  played.forEach((f: any) => {
-    if (f.round > lastRound) lastRound = f.round;
+  teamsData.forEach((t: any) => {
+    teamName.set(t.id, t.name);
   });
 
+  // --- zadnje odigrano kolo ---
+  const fixturesWithResult = fixtures.filter((f) => {
+    const { home, away } = safeResult(f);
+    return home !== null && away !== null;
+  });
+
+  let lastRound = 0;
+  for (const f of fixturesWithResult) {
+    if (f.round && f.round > lastRound) lastRound = f.round;
+  }
   if (lastRound === 0) lastRound = 1;
+
   const nextRound = lastRound + 1;
 
-  // HTML builder
-  let html = `
-<!DOCTYPE html>
-<html lang="hr">
-<head>
-<meta charset="utf-8" />
-<title>Izvještaj ${lastRound}. kolo — Panadić 2025/26</title>
+  // --- HTML helperi ---
 
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    margin: 40px;
-    color: #111;
-  }
-  h1 {
-    text-align: center;
-    color: #0A5E2A;
-    margin-bottom: 0;
-    font-size: 38px;
-  }
-  h2 {
-    text-align: center;
-    color: #0A5E2A;
-    margin-top: 60px;
-    margin-bottom: 10px;
-    font-size: 28px;
-  }
-  h3 {
-    color: #0A5E2A;
-    margin-top: 25px;
-    margin-bottom: 8px;
-    font-size: 20px;
-  }
-  p.subtitle {
-    text-align: center;
-    color: #F37C22;
-    margin-top: 8px;
-    font-size: 16px;
-  }
+  function renderResultsTable(leagueCode: string) {
+    const fxRound = fixtures
+      .filter((f) => f.league_code === leagueCode && f.round === lastRound)
+      .sort((a, b) => {
+        if (a.match_date === b.match_date) {
+          return (a.match_time || "").localeCompare(b.match_time || "");
+        }
+        return (a.match_date || "").localeCompare(b.match_date || "");
+      });
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-    margin-bottom: 22px;
-  }
-  th {
-    background: #FFF0E6;
-    color: #F37C22;
-    font-weight: bold;
-    padding: 6px;
-    border: 1px solid #e7d7c7;
-  }
-  td {
-    padding: 6px;
-    border: 1px solid #e7d7c7;
-  }
-  tr:nth-child(even) td {
-    background: #FFF8F2;
-  }
+    if (fxRound.length === 0) {
+      return `<p>Nema odigranih utakmica u ovom kolu.</p>`;
+    }
 
-  .center { text-align: center; }
-  .left { text-align: left; }
+    const rows = fxRound
+      .map((f, idx) => {
+        const { home, away } = safeResult(f);
 
-  .page-break {
-    page-break-after: always;
-  }
-
-  footer {
-    margin-top: 60px;
-    text-align: center;
-    color: #F37C22;
-    font-size: 14px;
-  }
-</style>
-</head>
-<body>
-
-<h1>Izvještaj nakon ${lastRound}. kola</h1>
-<p class="subtitle">malonogometne lige Panadić 2025/26</p>
-<p class="subtitle">Automatski generiran iz aplikacije panadic.vercel.app</p>
-
-`;
-
-  // helper funkcije
-  function tableResults(league: string) {
-    const fx = fixtures.filter(
-      (f: any) => f.league_code === league && f.round === lastRound
-    );
-
-    if (fx.length === 0) return "<p>Nema odigranih utakmica u ovom kolu.</p>";
-
-    return `
-<table>
-  <thead>
-    <tr>
-      <th>Domaćin</th>
-      <th>Gost</th>
-      <th class="center">Rezultat</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${fx
-      .map((f: any) => {
-        const res = f.results?.[0];
         const score =
-          res?.home_goals !== null && res?.away_goals !== null
-            ? `${res.home_goals}:${res.away_goals}`
+          home !== null &&
+          home !== undefined &&
+          away !== null &&
+          away !== undefined
+            ? `${home}:${away}`
             : "-:-";
 
+        const cls = idx % 2 === 1 ? 'class="shaded"' : "";
         return `
-      <tr>
-        <td class="left">${esc(teamName.get(f.home_team_id))}</td>
-        <td class="left">${esc(teamName.get(f.away_team_id))}</td>
-        <td class="center">${score}</td>
-      </tr>`;
+        <tr ${cls}>
+          <td class="left">${esc(teamName.get(f.home_team_id) || f.home_team_id)}</td>
+          <td class="left">${esc(teamName.get(f.away_team_id) || f.away_team_id)}</td>
+          <td class="center">${esc(score)}</td>
+        </tr>`;
       })
-      .join("")}
-  </tbody>
-</table>`;
+      .join("");
+
+    return `
+      <table>
+        <thead>
+          <tr class="header">
+            <th>Domaćin</th>
+            <th>Gost</th>
+            <th class="center">Rezultat</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    `;
   }
 
-  function tableStandings(league: string) {
-    const st = standings
-      .filter((s: any) => s.league_code === league)
-      .map((s: any) => ({
+  function renderStandingsTable(leagueCode: string) {
+    const st = standings.filter((s) => s.league_code === leagueCode);
+    if (st.length === 0) {
+      return `<p>Nema tablice za ovu ligu.</p>`;
+    }
+
+    const enriched = st
+      .map((s) => ({
         ...s,
-        name: teamName.get(s.team_id),
+        name: teamName.get(s.team_id) || String(s.team_id),
       }))
-      .sort((a: any, b: any) => {
+      .sort((a, b) => {
         if (b.bodovi !== a.bodovi) return b.bodovi - a.bodovi;
         if (b.gr !== a.gr) return b.gr - a.gr;
         if (b.gplus !== a.gplus) return b.gplus - a.gplus;
         return a.name.localeCompare(b.name);
       });
 
-    if (st.length === 0) return "<p>Nema tablice za ovu ligu.</p>";
+    const rows = enriched
+      .map((s, idx) => {
+        const cls = idx % 2 === 1 ? 'class="shaded"' : "";
+        const rank = idx + 1;
+        return `
+        <tr ${cls}>
+          <td class="center">${rank}</td>
+          <td class="left">${esc(s.name)}</td>
+          <td class="center">${s.ut}</td>
+          <td class="center">${s.p}</td>
+          <td class="center">${s.n}</td>
+          <td class="center">${s.i}</td>
+          <td class="center">${s.gplus}</td>
+          <td class="center">${s.gminus}</td>
+          <td class="center">${s.gr}</td>
+          <td class="center">${s.bodovi}</td>
+        </tr>`;
+      })
+      .join("");
 
     return `
-<table>
-  <thead>
-    <tr>
-      <th class="center">R.br</th>
-      <th>Ekipa</th>
-      <th class="center">UT</th>
-      <th class="center">P</th>
-      <th class="center">N</th>
-      <th class="center">I</th>
-      <th class="center">G+</th>
-      <th class="center">G-</th>
-      <th class="center">GR</th>
-      <th class="center">Bodovi</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${st
-      .map(
-        (s: any, i: number) => `
-      <tr>
-        <td class="center">${i + 1}</td>
-        <td class="left">${esc(s.name)}</td>
-        <td class="center">${s.ut}</td>
-        <td class="center">${s.p}</td>
-        <td class="center">${s.n}</td>
-        <td class="center">${s.i}</td>
-        <td class="center">${s.gplus}</td>
-        <td class="center">${s.gminus}</td>
-        <td class="center">${s.gr}</td>
-        <td class="center">${s.bodovi}</td>
-      </tr>
-    `
-      )
-      .join("")}
-  </tbody>
-</table>`;
+      <table>
+        <thead>
+          <tr class="header">
+            <th>R.br</th>
+            <th>Ekipa</th>
+            <th>UT</th>
+            <th>P</th>
+            <th>N</th>
+            <th>I</th>
+            <th>G+</th>
+            <th>G-</th>
+            <th>GR</th>
+            <th>Bodovi</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    `;
   }
 
-  function tableNextRound(league: string) {
-    const fx = fixtures.filter(
-      (f: any) => f.league_code === league && f.round === nextRound
-    );
+  function renderNextRoundTable(leagueCode: string) {
+    const fxNext = fixtures
+      .filter((f) => f.league_code === leagueCode && f.round === nextRound)
+      .sort((a, b) => {
+        if (a.match_date === b.match_date) {
+          return (a.match_time || "").localeCompare(b.match_time || "");
+        }
+        return (a.match_date || "").localeCompare(b.match_date || "");
+      });
 
-    if (fx.length === 0) return "<p>Nema rasporeda za iduće kolo.</p>";
+    if (fxNext.length === 0) {
+      return `<p>Nema rasporeda za iduće kolo.</p>`;
+    }
+
+    const rows = fxNext
+      .map((f, idx) => {
+        const cls = idx % 2 === 1 ? 'class="shaded"' : "";
+        return `
+        <tr ${cls}>
+          <td>${esc(f.match_date || "")}</td>
+          <td class="center">${esc(shortTime(f.match_time))}</td>
+          <td class="left">${esc(teamName.get(f.home_team_id) || f.home_team_id)}</td>
+          <td class="left">${esc(teamName.get(f.away_team_id) || f.away_team_id)}</td>
+        </tr>`;
+      })
+      .join("");
 
     return `
-<table>
-  <thead>
-    <tr>
-      <th>Datum</th>
-      <th class="center">Vrijeme</th>
-      <th>Domaćin</th>
-      <th>Gost</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${fx
-      .map(
-        (f: any) => `
-      <tr>
-        <td>${esc(f.match_date)}</td>
-        <td class="center">${esc(shortTime(f.match_time))}</td>
-        <td class="left">${esc(teamName.get(f.home_team_id))}</td>
-        <td class="left">${esc(teamName.get(f.away_team_id))}</td>
-      </tr>
-    `
-      )
-      .join("")}
-  </tbody>
-</table>`;
+      <table>
+        <thead>
+          <tr class="header">
+            <th>Datum</th>
+            <th>Vrijeme</th>
+            <th>Domaćin</th>
+            <th>Gost</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    `;
   }
 
-  // sadrzaj po ligama
-  for (const lg of LEAGUES) {
-    html += `
-<div class="page-break"></div>
+  const leaguesHtml = LEAGUES.map((lg) => {
+    return `
+      <section class="league-section">
+        <h2>${esc(lg.label)}</h2>
 
-<h2>${esc(lg.label)}</h2>
+        <h3>Rezultati ${lastRound}. kola</h3>
+        ${renderResultsTable(lg.db)}
 
-<h3>Rezultati ${lastRound}. kola</h3>
-${tableResults(lg.db)}
+        <h3>Tablica nakon ${lastRound}. kola</h3>
+        ${renderStandingsTable(lg.db)}
 
-<h3>Tablica nakon ${lastRound}. kola</h3>
-${tableStandings(lg.db)}
+        <h3>Iduće kolo (${nextRound}. kolo)</h3>
+        ${renderNextRoundTable(lg.db)}
+      </section>
+    `;
+  }).join("");
 
-<h3>Iduće kolo (${nextRound}. kolo)</h3>
-${tableNextRound(lg.db)}
-`;
-  }
+  const html = `
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Izvještaj nakon ${lastRound}. kola — Panadić 2025/26</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 40px;
+      color: #222;
+    }
+    h1 {
+      text-align: center;
+      color: #0A5E2A;
+      margin-bottom: 8px;
+    }
+    h2 {
+      text-align: center;
+      color: #0A5E2A;
+      margin-top: 40px;
+      margin-bottom: 10px;
+    }
+    h3 {
+      color: #0A5E2A;
+      margin-top: 20px;
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #F37C22;
+      margin-bottom: 30px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 18px;
+      font-size: 12px;
+    }
+    th, td {
+      padding: 4px 6px;
+    }
+    th {
+      background: #FFF0E6;
+      color: #F37C22;
+      border-bottom: 1px solid #e0d4c5;
+    }
+    .header {
+      background: #FFF0E6;
+    }
+    .shaded {
+      background: #FFF8F2;
+    }
+    .center {
+      text-align: center;
+    }
+    .left {
+      text-align: left;
+    }
+    tfoot td {
+      font-size: 10px;
+      text-align: center;
+      padding-top: 20px;
+      color: #F37C22;
+    }
+    .league-section {
+      page-break-after: always;
+    }
+    .league-section:last-of-type {
+      page-break-after: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Izvještaj nakon ${lastRound}. kola</h1>
+  <div class="subtitle">malonogometne lige Panadić 2025/26</div>
 
-  html += `
-<footer>panadic.vercel.app</footer>
+  <p style="text-align:center; font-size: 11px; margin-bottom: 40px; color:#555;">
+    Automatski generiran izvještaj iz aplikacije <strong>panadic.vercel.app</strong>
+  </p>
+
+  ${leaguesHtml}
+
+  <footer>
+    <table>
+      <tfoot>
+        <tr>
+          <td>panadic.vercel.app</td>
+        </tr>
+      </tfoot>
+    </table>
+  </footer>
 </body>
 </html>
 `;
 
   return new NextResponse(html, {
     status: 200,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
   });
 }
