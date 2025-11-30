@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { recalculateStandings } from "@/lib/recalculateStandings";
+// ✅ NOVI IMPORT – umjesto recalculateStandings
+import { recalculateStandingsForFixture } from "@/lib/recalculateStandings";
 
 type LeagueCode =
   | "PIONIRI"
@@ -105,7 +106,12 @@ export default function AdminPage() {
         .insert({ fixture_id: fixtureId, home_goals: hg, away_goals: ag });
     }
 
-    if (league) await recalculateStandings(LEAGUE_DB_CODE[league] as any);
+    // 🔁 STARO:
+    // if (league) await recalculateStandings(LEAGUE_DB_CODE[league] as any);
+
+    // ✅ NOVO: računaj standings prema KONKRETNOM fixture-u
+    await recalculateStandingsForFixture(fixtureId);
+
     if (league) loadFixtures(league);
   }
 
@@ -115,7 +121,12 @@ export default function AdminPage() {
 
     await supabase.from("results").delete().eq("fixture_id", fixtureId);
 
-    if (league) await recalculateStandings(LEAGUE_DB_CODE[league] as any);
+    // 🔁 STARO:
+    // if (league) await recalculateStandings(LEAGUE_DB_CODE[league] as any);
+
+    // ✅ NOVO: opet prema fixture-u
+    await recalculateStandingsForFixture(fixtureId);
+
     if (league) loadFixtures(league);
   }
 
@@ -229,7 +240,7 @@ export default function AdminPage() {
       {/* ▼ LOADING */}
       {loading && <div>Učitavanje...</div>}
 
-      {/* ▼ FIXTURE UI (bez promjena) */}
+      {/* ▼ FIXTURE UI */}
       {league && !loading && (
         <>
           {/* ACTUAL ROUND */}
@@ -302,7 +313,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ALL ROUNDS (NIŠTA NE DIRAM) */}
+          {/* ALL ROUNDS */}
           {view === "ALL" && (
             <div className="space-y-8">
               {Object.keys(
