@@ -145,3 +145,28 @@ export async function recalculateStandings(leagueCode: LeagueCode) {
 
   console.log("Standings updated for", leagueCode);
 }
+
+/* -------------------------------------------------------------------
+    🔥 NOVO: recalculation samo za JEDAN fixture
+------------------------------------------------------------------- */
+
+export async function recalculateStandingsForFixture(fixtureId: number) {
+  // 1) dohvatimo fixture
+  const { data: fixture, error: fixtureErr } = await supabase
+    .from("fixtures")
+    .select("league_code")
+    .eq("id", fixtureId)
+    .single();
+
+  if (fixtureErr || !fixture) {
+    console.error("❌ Cannot load fixture for partial recalculation", fixtureErr);
+    return;
+  }
+
+  const leagueCode = fixture.league_code as LeagueCode;
+
+  // 2) koristimo postojeću funkciju (NE diramo stari kod)
+  await recalculateStandings(leagueCode);
+
+  console.log("Standings updated for fixture", fixtureId);
+}
