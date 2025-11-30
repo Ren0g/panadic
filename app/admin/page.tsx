@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { recalculateStandingsForFixture } from "@/lib/recalculateStandings";
 
@@ -26,7 +26,6 @@ const LEAGUE_DB_CODE: Record<LeagueCode, string> = {
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [authorized, setAuthorized] = useState(false);
-
   const [view, setView] = useState<"CURRENT" | "ALL">("CURRENT");
   const [league, setLeague] = useState<LeagueCode | "">("");
   const [fixtures, setFixtures] = useState<any[]>([]);
@@ -119,7 +118,7 @@ export default function AdminPage() {
     if (league) loadFixtures(league);
   }
 
-  // LOGIN
+  // LOGIN SCREEN
   if (!authorized) {
     return (
       <form
@@ -145,7 +144,7 @@ export default function AdminPage() {
     );
   }
 
-  // ADMIN PANEL
+  // MAIN ADMIN PANEL
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
       <div className="text-center space-y-4">
@@ -170,7 +169,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* -------- ODABIR LIGE -------- */}
+      {/* -------- SELECT LIGE -------- */}
       <div className="bg-[#f7f1e6] p-4 rounded-xl border border-[#c8b59a] text-center">
         <label className="font-semibold text-[#0A5E2A]">Odaberi ligu:</label>
 
@@ -194,7 +193,7 @@ export default function AdminPage() {
         </select>
       </div>
 
-      {/* -------- AKTUALNO / SVA KOLA -------- */}
+      {/* -------- VIEW SWITCH -------- */}
       {league && (
         <div className="flex gap-4 justify-center">
           <button
@@ -221,10 +220,10 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* -------- UČITAVANJE -------- */}
+      {/* -------- LOADING -------- */}
       {loading && <div>Učitavanje...</div>}
 
-      {/* -------- SVI FIXTUREI -------- */}
+      {/* -------- VIEW FIXTURES -------- */}
       {league && !loading && (
         <>
           {view === "CURRENT" && nextRound && (
@@ -382,23 +381,15 @@ export default function AdminPage() {
         </>
       )}
 
-      {/* -------- EXPORT GUMB -------- */}
+      {/* -------- IZVJEŠTAJ GUMB -------- */}
       <div className="flex justify-end mt-10">
         <button
-          onClick={async () => {
-            const res = await fetch("/api/export/word", { method: "POST" });
-
-            const blob = await res.blob();
-            const url = window.URL.createObjectURL(blob);
-
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "izvjestaj_2_kolo.docx";
-            a.click();
+          onClick={() => {
+            window.open("/api/report", "_blank");
           }}
           className="px-4 py-2 text-white rounded-full cursor-pointer bg-[#0A5E2A] hover:bg-[#08471f] shadow mr-4"
         >
-          📄 Generiraj izvještaj (Word)
+          📄 Otvori izvještaj (HTML / PDF)
         </button>
 
         <button
