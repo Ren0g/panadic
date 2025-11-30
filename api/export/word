@@ -150,19 +150,7 @@ export async function POST() {
     teamName.set(t.id, t.name);
   });
 
-  // ručni patch satnica (tvoje 2 specijalne utakmice)
-  fixtures.forEach((f) => {
-    if (f.id === 158) {
-      // Početnici A – Gorica - Ban Jelačić
-      f.match_time = "14:33:00";
-    }
-    if (f.id === 218) {
-      // Početnici B – Lukavec - Mraclin
-      f.match_time = "17:18:00";
-    }
-  });
-
-  // --- 2. Odredi zadnje odigrano kolo (bilo koja liga) ---
+   // --- 2. Odredi zadnje odigrano kolo (bilo koja liga) ---
 
   const fixturesWithResult = fixtures.filter(
     (f) => f.results && f.results.length > 0 && f.results[0].home_goals !== null && f.results[0].away_goals !== null
