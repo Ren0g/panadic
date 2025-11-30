@@ -1,1 +1,585 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import {
+  AlignmentType,
+  Document,
+  Footer,
+  HeadingLevel,
+  Packer,
+  Paragraph,
+  ShadingType,
+  Table,
+  TableCell,
+  TableRow,
+  TextRun,
+  WidthType,
+} from "docx";
+
+// --- SUPABASE SERVER CLIENT ---
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+type FixtureRow = {
+  id: number;
+  league_code: string;
+  round: number;
+  match_date: string | null;
+  match_time: string | null;
+  home_team_id: number;
+  away_team_id: number;
+  results: { home_goals: number | null; away_goals: number | null }[] | null;
+};
+
+type StandingRow = {
+  league_code: string;
+  team_id: number;
+  ut: number;
+  p: number;
+  n: number;
+  i: number;
+  gplus: number;
+  gminus: number;
+  gr: number;
+  bodovi: number;
+  phase: string | null;
+  group_code: string | null;
+};
+
+const LEAGUES = [
+  { db: "PIONIRI_REG", label: "Pioniri" },
+  { db: "MLPIONIRI_REG", label: "Mlađi pioniri" },
+  { db: "PRSTICI_REG", label: "Prstići" },
+  { db: "POC_REG_A", label: "Početnici A" },
+  { db: "POC_REG_B", label: "Početnici B" },
+  { db: "POC_GOLD", label: "Zlatna liga" },
+  { db: "POC_SILVER", label: "Srebrna liga" },
+];
+
+// kratko HH:MM umjesto HH:MM:SS
+function shortTime(t: string | null): string {
+  if (!t) return "";
+  if (t.length >= 5) return t.slice(0, 5);
+  return t;
+}
+
+// header cell s narančastim tekstom i sjenčanjem
+function headerCell(text: string): TableCell {
+  return new TableCell({
+    shading: {
+      type: ShadingType.CLEAR,
+      color: "auto",
+      fill: "FFF0E6",
+    },
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({
+            text,
+            bold: true,
+            color: "F37C22",
+            size: 18, // 9 pt
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+// obična ćelija, opcionalno sjenčana
+function dataCell(
+  text: string,
+  shaded: boolean,
+  align: AlignmentType = AlignmentType.CENTER
+): TableCell {
+  return new TableCell({
+    shading: shaded
+      ? {
+          type: ShadingType.CLEAR,
+          color: "auto",
+          fill: "FFF0E6",
+        }
+      : undefined,
+    children: [
+      new Paragraph({
+        alignment: align,
+        children: [
+          new TextRun({
+            text,
+            size: 18, // 9 pt
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+export async function POST() {
+  // --- 1. Dohvati sve potrebne podatke iz Supabase-a ---
+
+  const [
+    { data: teamsData, error: teamsError },
+    { data: fixturesRaw, error: fixturesError },
+    { data: standingsData, error: standingsError },
+  ] = await Promise.all([
+    supabase.from("teams").select("id, name"),
+    supabase
+      .from("fixtures")
+      .select(
+        `
+        id,
+        league_code,
+        round,
+        match_date,
+        match_time,
+        home_team_id,
+        away_team_id,
+        results:results ( home_goals, away_goals )
+        `
+      )
+      .order("league_code")
+      .order("round")
+      .order("match_date"),
+    supabase.from("standings").select("*"),
+  ]);
+
+  if (
+    teamsError ||
+    fixturesError ||
+    standingsError ||
+    !teamsData ||
+    !fixturesRaw ||
+    !standingsData
+  ) {
+    console.error("Greška pri dohvaćanju podataka:", {
+      teamsError,
+      fixturesError,
+      standingsError,
+    });
+    return new NextResponse("Greška pri dohvaćanju podataka iz Supabase-a", {
+      status: 500,
+    });
+  }
+
+  const fixtures: FixtureRow[] = fixturesRaw as any;
+  const standings: StandingRow[] = standingsData as any;
+
+  const teamName = new Map<number, string>();
+  teamsData.forEach((t: any) => {
+    teamName.set(t.id, t.name);
+  });
+
+  // --- 2. Odredi zadnje odigrano kolo (bilo koja liga) ---
+
+  const fixturesWithResult = fixtures.filter(
+    (f) =>
+      f.results &&
+      f.results.length > 0 &&
+      f.results[0].home_goals !== null &&
+      f.results[0].away_goals !== null
+  );
+
+  let lastRound = 0;
+  for (const f of fixturesWithResult) {
+    if (f.round && f.round > lastRound) lastRound = f.round;
+  }
+  if (lastRound === 0) lastRound = 1; // fallback da nešto postoji
+
+  const nextRound = lastRound + 1;
+
+  // --- 3. Footer (link) ---
+
+  const footer = new Footer({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({
+            text: "panadic.vercel.app",
+            size: 18, // 9 pt
+            color: "F37C22",
+          }),
+        ],
+      }),
+    ],
+  });
+
+  const children: (Paragraph | Table)[] = [];
+
+  // --- 4. Naslovna stranica ---
+
+  // malo praznog prostora da izgleda centrirano vertikalno
+  for (let i = 0; i < 8; i++) {
+    children.push(new Paragraph(""));
+  }
+
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      heading: HeadingLevel.TITLE,
+      children: [
+        new TextRun({
+          text: `Izvještaj nakon ${lastRound}. kola`,
+          bold: true,
+          size: 44, // 22 pt
+        }),
+        new TextRun({
+          text: "\nmalonogometne lige Panadić 2025/26",
+          bold: true,
+          size: 32, // 16 pt
+        }),
+      ],
+    })
+  );
+
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [
+        new TextRun({
+          text: "Automatski generiran izvještaj iz aplikacije panadic.vercel.app",
+          size: 18, // 9 pt
+          color: "F37C22",
+        }),
+      ],
+    })
+  );
+
+  // prisilni page break prije prvog sadržaja liga
+  children.push(
+    new Paragraph({
+      children: [],
+      pageBreakBefore: true,
+    })
+  );
+
+  // --- 5. Helperi za tablice ---
+
+  function addResultsTable(leagueCode: string, leagueLabel: string) {
+    const fxRound = fixtures
+      .filter((f) => f.league_code === leagueCode && f.round === lastRound)
+      .sort((a, b) => {
+        if (a.match_date === b.match_date) {
+          return (a.match_time || "").localeCompare(b.match_time || "");
+        }
+        return (a.match_date || "").localeCompare(b.match_date || "");
+      });
+
+    children.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        alignment: AlignmentType.LEFT,
+        children: [
+          new TextRun({
+            text: `Rezultati ${lastRound}. kola`,
+            bold: true,
+            size: 28, // 14 pt
+          }),
+        ],
+      })
+    );
+
+    if (fxRound.length === 0) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "Nema odigranih utakmica u ovom kolu.",
+              size: 18,
+            }),
+          ],
+        })
+      );
+      return;
+    }
+
+    const rows: TableRow[] = [];
+
+    rows.push(
+      new TableRow({
+        cantSplit: true,
+        children: [
+          headerCell("Domaćin"),
+          headerCell("Gost"),
+          headerCell("Rezultat"),
+        ],
+      })
+    );
+
+    fxRound.forEach((f, idx) => {
+      const res = f.results && f.results[0];
+      const score =
+        res && res.home_goals !== null && res.away_goals !== null
+          ? `${res.home_goals}:${res.away_goals}`
+          : "-:-";
+
+      const shaded = idx % 2 === 1;
+
+      rows.push(
+        new TableRow({
+          cantSplit: true,
+          children: [
+            dataCell(
+              teamName.get(f.home_team_id) || String(f.home_team_id),
+              shaded,
+              AlignmentType.LEFT
+            ),
+            dataCell(
+              teamName.get(f.away_team_id) || String(f.away_team_id),
+              shaded,
+              AlignmentType.LEFT
+            ),
+            dataCell(score, shaded, AlignmentType.CENTER),
+          ],
+        })
+      );
+    });
+
+    children.push(
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        alignment: AlignmentType.CENTER,
+        rows,
+      })
+    );
+  }
+
+  function addStandingsTable(leagueCode: string) {
+    const st = standings.filter((s) => s.league_code === leagueCode);
+    children.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        alignment: AlignmentType.LEFT,
+        children: [
+          new TextRun({
+            text: `Tablica nakon ${lastRound}. kola`,
+            bold: true,
+            size: 28,
+          }),
+        ],
+      })
+    );
+
+    if (st.length === 0) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "Nema tablice za ovu ligu.",
+              size: 18,
+            }),
+          ],
+        })
+      );
+      return;
+    }
+
+    const enriched = st
+      .map((s) => ({
+        ...s,
+        name: teamName.get(s.team_id) || String(s.team_id),
+      }))
+      .sort((a, b) => {
+        // bodovi desc, GR desc, G+ desc, naziv asc
+        if (b.bodovi !== a.bodovi) return b.bodovi - a.bodovi;
+        if (b.gr !== a.gr) return b.gr - a.gr;
+        if (b.gplus !== a.gplus) return b.gplus - a.gplus;
+        return a.name.localeCompare(b.name);
+      });
+
+    const rows: TableRow[] = [];
+
+    rows.push(
+      new TableRow({
+        cantSplit: true,
+        children: [
+          headerCell("R.br"),
+          headerCell("Ekipa"),
+          headerCell("UT"),
+          headerCell("P"),
+          headerCell("N"),
+          headerCell("I"),
+          headerCell("G+"),
+          headerCell("G-"),
+          headerCell("GR"),
+          headerCell("Bodovi"),
+        ],
+      })
+    );
+
+    enriched.forEach((s, idx) => {
+      const shaded = idx % 2 === 1;
+      const rank = idx + 1;
+
+      rows.push(
+        new TableRow({
+          cantSplit: true,
+          children: [
+            dataCell(String(rank), shaded),
+            dataCell(s.name, shaded, AlignmentType.LEFT),
+            dataCell(String(s.ut), shaded),
+            dataCell(String(s.p), shaded),
+            dataCell(String(s.n), shaded),
+            dataCell(String(s.i), shaded),
+            dataCell(String(s.gplus), shaded),
+            dataCell(String(s.gminus), shaded),
+            dataCell(String(s.gr), shaded),
+            dataCell(String(s.bodovi), shaded),
+          ],
+        })
+      );
+    });
+
+    children.push(
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        alignment: AlignmentType.CENTER,
+        rows,
+      })
+    );
+  }
+
+  function addNextRoundTable(leagueCode: string) {
+    children.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        alignment: AlignmentType.LEFT,
+        children: [
+          new TextRun({
+            text: `Iduće kolo (${nextRound}. kolo)`,
+            bold: true,
+            size: 28,
+          }),
+        ],
+      })
+    );
+
+    const fxNext = fixtures
+      .filter((f) => f.league_code === leagueCode && f.round === nextRound)
+      .sort((a, b) => {
+        if (a.match_date === b.match_date) {
+          return (a.match_time || "").localeCompare(b.match_time || "");
+        }
+        return (a.match_date || "").localeCompare(b.match_date || "");
+      });
+
+    if (fxNext.length === 0) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "Nema rasporeda za iduće kolo.",
+              size: 18,
+            }),
+          ],
+        })
+      );
+      return;
+    }
+
+    const rows: TableRow[] = [];
+
+    rows.push(
+      new TableRow({
+        cantSplit: true,
+        children: [
+          headerCell("Datum"),
+          headerCell("Vrijeme"),
+          headerCell("Domaćin"),
+          headerCell("Gost"),
+        ],
+      })
+    );
+
+    fxNext.forEach((f, idx) => {
+      const shaded = idx % 2 === 1;
+      rows.push(
+        new TableRow({
+          cantSplit: true,
+          children: [
+            dataCell(f.match_date || "", shaded),
+            dataCell(shortTime(f.match_time), shaded),
+            dataCell(
+              teamName.get(f.home_team_id) || String(f.home_team_id),
+              shaded,
+              AlignmentType.LEFT
+            ),
+            dataCell(
+              teamName.get(f.away_team_id) || String(f.away_team_id),
+              shaded,
+              AlignmentType.LEFT
+            ),
+          ],
+        })
+      );
+    });
+
+    children.push(
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        alignment: AlignmentType.CENTER,
+        rows,
+      })
+    );
+  }
+
+  // --- 6. Po ligama ---
+
+  LEAGUES.forEach((lg, index) => {
+    if (index > 0) {
+      // prisilni page break prije nove selekcije
+      children.push(
+        new Paragraph({
+          children: [],
+          pageBreakBefore: true,
+        })
+      );
+    }
+
+    children.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({
+            text: lg.label,
+            bold: true,
+            size: 32,
+          }),
+        ],
+      })
+    );
+
+    addResultsTable(lg.db, lg.label);
+    addStandingsTable(lg.db);
+    addNextRoundTable(lg.db);
+  });
+
+  // --- 7. Sastavi Word dokument ---
+
+  const doc = new Document({
+    sections: [
+      {
+        properties: {
+          footers: {
+            default: footer,
+          },
+        },
+        children,
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+
+  return new NextResponse(buffer, {
+    status: 200,
+    headers: {
+      "Content-Type":
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "Content-Disposition": `attachment; filename="izvjestaj_kolo_${lastRound}.docx"`,
+    },
+  });
+}
 
