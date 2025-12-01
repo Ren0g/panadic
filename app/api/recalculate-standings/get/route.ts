@@ -12,9 +12,9 @@ export async function GET(req: Request) {
   }
 
   try {
-    // Poziv originalnog POST endpointa
+    // Direktno zovi POST endpoint na tvojoj domeni
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL || "https://panadic.vercel.app"}/api/recalculate-standings?fixtureId=${fixtureId}`,
+      `https://panadic.vercel.app/api/recalculate-standings?fixtureId=${fixtureId}`,
       {
         method: "POST",
       }
