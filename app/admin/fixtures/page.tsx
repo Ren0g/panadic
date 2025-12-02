@@ -27,13 +27,13 @@ type Fixture = {
 };
 
 type EditState = {
-  match_date: string; // dd.mm.yyyy.
-  match_time: string; // HH:MM
+  match_date: string;
+  match_time: string;
   home_goals: string;
   away_goals: string;
 };
 
-// ---------------- FORMATIRANJE DATUMA ----------------
+// ---------------- FORMATIRANJE ----------------
 
 function formatDateToCro(dateIso: string | null): string {
   if (!dateIso) return '';
@@ -47,7 +47,7 @@ function formatDateToCro(dateIso: string | null): string {
 
 function formatDateToIso(cro: string): string {
   if (!cro) return '';
-  const clean = cro.replace(/\./g, '').trim(); // '22112025'
+  const clean = cro.replace(/\./g, '').trim();
   const dd = clean.slice(0, 2);
   const mm = clean.slice(2, 4);
   const yyyy = clean.slice(4, 8);
@@ -59,7 +59,7 @@ function formatTimeToCro(t: string | null): string {
   return t.slice(0, 5);
 }
 
-// -----------------------------------------------------
+// ---------------- LIGE ----------------
 
 const LEAGUES = [
   { label: 'Pioniri', value: 'PIONIRI_REG' },
@@ -70,6 +70,10 @@ const LEAGUES = [
   { label: 'Zlatna liga', value: 'POC_GOLD' },
   { label: 'Srebrna liga', value: 'POC_SILVER' }
 ];
+
+// ==========================================================
+// PAGE
+// ==========================================================
 
 export default function AdminFixturesPage() {
   const [leagueCode, setLeagueCode] = useState<string>('');
@@ -243,10 +247,8 @@ export default function AdminFixturesPage() {
         return;
       }
 
-      // Rekalkulacija
       await fetch(`/api/recalculate-standings?fixtureId=${selectedFixture.id}`);
 
-      // Update lokalno
       const updated = fixtures.map((x) =>
         x.id === selectedFixture.id
           ? {
@@ -275,19 +277,28 @@ export default function AdminFixturesPage() {
     <div className="p-4 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Modifikacija susreta (kola)</h1>
 
+      {/* POVRATAK */}
+      <button
+        onClick={() => (window.location.href = '/admin')}
+        className="mb-6 px-4 py-2 rounded bg-[#f7f1e6] border border-[#c8b59a] 
+                   text-[#0A5E2A] shadow hover:bg-[#e8dfd0]"
+      >
+        ← Povratak na Admin panel
+      </button>
+
       {/* FILTERI */}
       <div className="border rounded-lg p-4 mb-6 space-y-4 bg-[#f7f1e6]">
         <h2 className="font-semibold">Filteri</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-          {/* DROPDOWN LIGA */}
+          {/* LIGA - DROPDOWN */}
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium">Liga</label>
             <select
               value={leagueCode}
               onChange={(e) => setLeagueCode(e.target.value)}
-              className="border rounded px-2 py-2 w-full cursor-pointer bg-white"
+              className="border rounded px-2 py-2 bg-white"
             >
               <option value="">— Odaberi ligu —</option>
               {LEAGUES.map((lg) => (
@@ -310,7 +321,7 @@ export default function AdminFixturesPage() {
             />
           </div>
 
-          {/* PRETRAZI KLUB */}
+          {/* PRETRAGA KLUBA */}
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium">Pretraži klub</label>
             <div className="flex gap-2">
@@ -341,7 +352,9 @@ export default function AdminFixturesPage() {
                   key={t.id}
                   onClick={() => setSelectedTeam(t)}
                   className={`px-3 py-1 rounded border text-sm ${
-                    selectedTeam?.id === t.id ? 'bg-green-600 text-white' : 'bg-white'
+                    selectedTeam?.id === t.id
+                      ? 'bg-green-600 text-white'
+                      : 'bg-white'
                   }`}
                 >
                   {t.name}
