@@ -134,36 +134,45 @@ export default function AdminPage() {
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-10">
 
-      {/* ---------- HEADER ---------- */}
-      <div className="text-center space-y-4">
-        <h1 className="text-2xl font-bold text-[#0A5E2A]">Admin panel — Unos rezultata</h1>
+      {/* ---------- HEADER (Back + Title + Izvještaji) ---------- */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => (window.location.href = "/")}
+          className="px-4 py-2 rounded-full bg-[#f7f1e6] border border-[#c8b59a] text-[#0A5E2A] shadow text-sm"
+        >
+          ← Početna
+        </button>
 
-        <div className="flex justify-center flex-wrap gap-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#0A5E2A] text-center flex-1">
+          Admin panel — Unos rezultata
+        </h1>
 
-          {/* LIVE unos — VRATILI SMO GA */}
-          <button
-            onClick={() => (window.location.href = "/admin/live")}
-            className="px-6 py-2 rounded-full bg-red-600 hover:bg-red-700 text-white shadow font-semibold"
-          >
-            LIVE unos rezultata
-          </button>
+        <button
+          onClick={() => (window.location.href = "/admin/izvjestaji")}
+          className="px-4 py-2 rounded-full bg-[#0A5E2A] hover:bg-[#08471f] text-white shadow text-sm"
+        >
+          Izvještaji
+        </button>
+      </div>
 
-          {/* Povratak */}
-          <button
-            onClick={() => (window.location.href = "/")}
-            className="px-6 py-2 rounded-full bg-[#f7f1e6] border border-[#c8b59a] text-[#0A5E2A] shadow"
-          >
-            ← Povratak na početnu
-          </button>
+      {/* ---------- Gumbi ispod naslova ---------- */}
+      <div className="flex justify-center flex-wrap gap-4">
 
-          {/* Modifikacija — VRATILI SMO JE */}
-          <button
-            onClick={() => (window.location.href = "/admin/fixtures")}
-            className="px-6 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow font-semibold"
-          >
-            🔧 Modifikacija susreta
-          </button>
-        </div>
+        {/* POVEĆANI LIVE GUMB (delegatski) */}
+        <button
+          onClick={() => (window.location.href = "/admin/live")}
+          className="px-10 py-4 rounded-full bg-red-600 hover:bg-red-700 text-white shadow font-bold text-lg"
+        >
+          LIVE unos rezultata
+        </button>
+
+        {/* MODIFIKACIJA — NARANČASTA PROMAR */}
+        <button
+          onClick={() => (window.location.href = "/admin/fixtures")}
+          className="px-6 py-3 rounded-full bg-[#f37c22] hover:bg-[#d96d1c] text-white shadow font-semibold"
+        >
+          🔧 Modifikacija susreta
+        </button>
       </div>
 
       {/* ---------- SELECT LIGE ---------- */}
@@ -189,7 +198,7 @@ export default function AdminPage() {
         </select>
       </div>
 
-      {/* ---------- SWITCH ---------- */}
+      {/* ---------- SWITCH CURRENT / ALL ---------- */}
       {league && (
         <div className="flex justify-center gap-4">
           <button
@@ -214,86 +223,79 @@ export default function AdminPage() {
 
       {loading && <div className="text-center">Učitavanje…</div>}
 
-      {/* ---------- AKTUALNO KOLO ---------- */}
+      {/* ---------- CURRENT ROUND ---------- */}
       {league && !loading && view === "CURRENT" && nextRound && (
         <div className="bg-[#f7f1e6] p-4 rounded-xl border">
-          <h2 className="text-xl font-bold text-[#0A5E2A] mb-4 text-center">
-            {nextRound}. kolo
-          </h2>
+          <h2 className="text-xl font-bold text-[#0A5E2A] mb-4 text-center">{nextRound}. kolo</h2>
 
-          {fixtures
-            .filter((f) => f.round === nextRound)
-            .map((f) => (
-              <div
-                key={f.id}
-                className="flex justify-between items-center bg-white py-2 px-3 rounded-lg border mb-2"
-              >
-                <div>
-                  <div className="font-semibold">{f.home_team} vs {f.away_team}</div>
-                  <div className="text-xs text-gray-500">
-                    {new Date(f.match_date).toLocaleDateString("hr-HR")} • {f.match_time?.slice(0, 5)}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* inputi */}
-                  <input
-                    type="number"
-                    className="w-12 border rounded-lg text-center"
-                    value={f.home_goals}
-                    onChange={(e) => setFixtures((prev) =>
-                      prev.map((x) => x.id === f.id ? { ...x, home_goals: e.target.value } : x)
-                    )}
-                  />
-                  <span className="font-bold">:</span>
-                  <input
-                    type="number"
-                    className="w-12 border rounded-lg text-center"
-                    value={f.away_goals}
-                    onChange={(e) => setFixtures((prev) =>
-                      prev.map((x) => x.id === f.id ? { ...x, away_goals: e.target.value } : x)
-                    )}
-                  />
-
-                  <button
-                    onClick={() => saveResult(f.id, f.home_goals, f.away_goals)}
-                    className="px-3 py-1 bg-green-700 text-white rounded-lg text-xs"
-                  >
-                    Spremi
-                  </button>
+          {fixtures.filter(f => f.round === nextRound).map(f => (
+            <div key={f.id} className="flex justify-between items-center bg-white py-2 px-3 rounded-lg border mb-2">
+              <div>
+                <div className="font-semibold">{f.home_team} vs {f.away_team}</div>
+                <div className="text-xs text-gray-500">
+                  {new Date(f.match_date).toLocaleDateString("hr-HR")} • {f.match_time?.slice(0,5)}
                 </div>
               </div>
-            ))}
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  className="w-12 border rounded-lg text-center"
+                  value={f.home_goals}
+                  onChange={(e) =>
+                    setFixtures(prev =>
+                      prev.map(x => x.id === f.id ? { ...x, home_goals: e.target.value } : x)
+                    )
+                  }
+                />
+
+                <span className="font-bold">:</span>
+
+                <input
+                  type="number"
+                  className="w-12 border rounded-lg text-center"
+                  value={f.away_goals}
+                  onChange={(e) =>
+                    setFixtures(prev =>
+                      prev.map(x => x.id === f.id ? { ...x, away_goals: e.target.value } : x)
+                    )
+                  }
+                />
+
+                <button
+                  onClick={() => saveResult(f.id, f.home_goals, f.away_goals)}
+                  className="px-3 py-1 bg-green-700 text-white rounded-lg text-xs"
+                >
+                  Spremi
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* ---------- SVA KOLA — KUTIJE ---------- */}
+      {/* ---------- ALL ROUNDS ---------- */}
       {league && !loading && view === "ALL" && (
         <div className="space-y-6">
-          {Object.keys(
-            fixtures.reduce((acc: any, f) => {
-              if (!acc[f.round]) acc[f.round] = [];
-              acc[f.round].push(f);
-              return acc;
-            }, {})
-          )
-            .sort((a, b) => Number(a) - Number(b))
-            .map((round) => {
-              const list = fixtures.filter((f) => f.round === Number(round));
-
+          {Object.keys(fixtures.reduce((acc:any,f)=>{
+            if(!acc[f.round]) acc[f.round]=[];
+            acc[f.round].push(f);
+            return acc;
+          },{}))
+            .sort((a,b)=>Number(a)-Number(b))
+            .map(round => {
+              const list = fixtures.filter(f=>f.round===Number(round));
               return (
                 <div key={round} className="rounded-xl border bg-[#f7f1e6] p-4">
                   <h2 className="text-xl font-bold text-[#0b5b2a] mb-3">{round}. kolo</h2>
 
                   <div className="space-y-2">
-                    {list.map((f) => (
+                    {list.map(f => (
                       <div key={f.id} className="flex justify-between items-center bg-white py-2 px-3 rounded-lg border">
                         <div>
-                          <div className="font-semibold">
-                            {f.home_team} vs {f.away_team}
-                          </div>
+                          <div className="font-semibold">{f.home_team} vs {f.away_team}</div>
                           <div className="text-xs text-gray-500">
-                            {new Date(f.match_date).toLocaleDateString("hr-HR")} • {f.match_time?.slice(0, 5)}
+                            {new Date(f.match_date).toLocaleDateString("hr-HR")} • {f.match_time?.slice(0,5)}
                           </div>
                         </div>
 
@@ -302,11 +304,9 @@ export default function AdminPage() {
                             type="number"
                             className="w-12 border rounded-lg text-center"
                             value={f.home_goals}
-                            onChange={(e) =>
-                              setFixtures((prev) =>
-                                prev.map((x) =>
-                                  x.id === f.id ? { ...x, home_goals: e.target.value } : x
-                                )
+                            onChange={(e)=>
+                              setFixtures(prev =>
+                                prev.map(x => x.id===f.id ? { ...x, home_goals: e.target.value } : x)
                               )
                             }
                           />
@@ -317,11 +317,9 @@ export default function AdminPage() {
                             type="number"
                             className="w-12 border rounded-lg text-center"
                             value={f.away_goals}
-                            onChange={(e) =>
-                              setFixtures((prev) =>
-                                prev.map((x) =>
-                                  x.id === f.id ? { ...x, away_goals: e.target.value } : x
-                                )
+                            onChange={(e)=>
+                              setFixtures(prev =>
+                                prev.map(x => x.id===f.id ? { ...x, away_goals: e.target.value } : x)
                               )
                             }
                           />
@@ -339,6 +337,7 @@ export default function AdminPage() {
                           >
                             Obriši
                           </button>
+
                         </div>
                       </div>
                     ))}
@@ -351,13 +350,6 @@ export default function AdminPage() {
 
       {/* ---------- FOOTER ---------- */}
       <footer className="text-center pt-10 opacity-80 text-sm">
-        <a
-          href="/admin/izvjestaji"
-          className="px-5 py-2 rounded-full bg-[#0A5E2A] text-white hover:bg-[#08471f] shadow inline-block"
-        >
-          Izvještaji
-        </a>
-
         <div className="mt-4">
           <a href="/admin/backup" className="text-gray-500 underline hover:text-gray-700">
             Backup
