@@ -28,11 +28,43 @@ type Fixture = {
 };
 
 type EditState = {
-  match_date: string;
-  match_time: string;
+  match_date: string; // dd.mm.yyyy.
+  match_time: string; // HH:MM
   home_goals: string;
   away_goals: string;
 };
+
+// ----------- FORMATIRANJE DATUMA I VREMENA -----------
+function formatDateToCro(dateIso: string | null): string {
+  if (!dateIso) return '';
+  const d = new Date(dateIso);
+  if (isNaN(d.getTime())) return '';
+
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+
+  return `${day}.${month}.${year}.`;
+}
+
+function formatDateToIso(croDate: string): string {
+  // očekuje format dd.mm.yyyy.
+  const clean = croDate.replace(/\./g, '').trim();
+  if (!clean) return '';
+
+  const day = clean.slice(0, 2);
+  const month = clean.slice(2, 4);
+  const year = clean.slice(4, 8);
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatTimeToCro(time: string | null): string {
+  if (!time) return '';
+  return time.slice(0, 5);
+}
+
+// ------------------------------------------------------
 
 export default function AdminFixturesPage() {
   const [leagueCode, setLeagueCode] = useState<string>('');
@@ -51,16 +83,7 @@ export default function AdminFixturesPage() {
   const [saving, setSaving] = useState<boolean>(false);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
-  // -- helperi
-  function formatDateForInput(dateStr: string | null): string {
-    if (!dateStr) return '';
-    // pretpostavka: u bazi ISO YYYY-MM-DD ili full timestamp
-    const d = new Date(dateStr);
-    if (Number.isNaN(d.getTime())) return dateStr; // fallback
-    return d.toISOString().slice(0, 10);
-  }
-
-  // 💡 DOHVAĆANJE TIMOVA (pretraživač klubova)
+  // ----------- TIMOVI -----------
   async function handleSearchTeams() {
     setError(null);
     setInfoMessage(null);
@@ -97,7 +120,7 @@ export default function AdminFixturesPage() {
     }
   }
 
-  // 💡 DOHVAĆANJE SUSRETA
+  // ----------- SUSRETI -----------
   async function handleSearchFixtures() {
     setError(null);
     setInfoMessage(null);
@@ -124,6 +147,14 @@ export default function AdminFixturesPage() {
       }
 
       const fixturesData: Fixture[] = data.fixtures || [];
+
+      // 🟢 ispravimo rezultat — u API response-u je "result: [{...}]"
+      fixturesData.forEach((fix: any) => {
+        if (Array.isArray(fix.result)) {
+          fix.result = fix.result.length > 0 ? fix.result[0] : null;
+        }
+      });
+
       setFixtures(fixturesData);
 
       if (fixturesData.length === 0) {
@@ -137,28 +168,19 @@ export default function AdminFixturesPage() {
     }
   }
 
-  // 💡 OTVARANJE EDIT MODALA
+  // ----------- EDIT MODAL -----------
   function openEditModal(fixture: Fixture) {
-    const dateInput = formatDateForInput(fixture.match_date);
-    const timeInput =
-      fixture.match_time?.slice(0, 5) || ''; // pretpostavka HH:MM:SS
-
-    const hg =
-      fixture.result && fixture.result.home_goals != null
-        ? String(fixture.result.home_goals)
-        : '';
-    const ag =
-      fixture.result && fixture.result.away_goals != null
-        ? String(fixture.result.away_goals)
-        : '';
+    const croDate = fixture.match_date ? formatDateToCro(fixture.match_date) : '';
+    const croTime = fixture.match_time ? formatTimeToCro(fixture.match_time) : '';
 
     setSelectedFixture(fixture);
     setEditState({
-      match_date: dateInput,
-      match_time: timeInput,
-      home_goals: hg,
-      away_goals: ag
+      match_date: croDate,
+      match_time: croTime,
+      home_goals: fixture.result?.home_goals != null ? String(fixture.result.home_goals) : '',
+      away_goals: fixture.result?.away_goals != null ? String(fixture.result.away_goals) : ''
     });
+
     setInfoMessage(null);
     setError(null);
   }
@@ -169,7 +191,7 @@ export default function AdminFixturesPage() {
     setSaving(false);
   }
 
-  // 💾 SPREMANJE PROMJENA
+  // ----------- SPREMANJE -----------
   async function handleSaveChanges() {
     if (!selectedFixture || !editState) return;
 
@@ -178,15 +200,15 @@ export default function AdminFixturesPage() {
     setInfoMessage(null);
 
     try {
-      const match_date = editState.match_date || null;
-      const match_time = editState.match_time || null;
+      const isoDate = editState.match_date ? formatDateToIso(editState.match_date) : null;
+      const finalTime = editState.match_time || null;
 
       let home_goals: number | null = null;
       let away_goals: number | null = null;
 
       if (editState.home_goals !== '') {
         const val = Number(editState.home_goals);
-        if (Number.isNaN(val)) {
+        if (isNaN(val)) {
           setError('Broj golova domaćina mora biti broj.');
           setSaving(false);
           return;
@@ -196,7 +218,7 @@ export default function AdminFixturesPage() {
 
       if (editState.away_goals !== '') {
         const val = Number(editState.away_goals);
-        if (Number.isNaN(val)) {
+        if (isNaN(val)) {
           setError('Broj golova gosta mora biti broj.');
           setSaving(false);
           return;
@@ -204,9 +226,10 @@ export default function AdminFixturesPage() {
         away_goals = val;
       }
 
-      const body: any = {};
-      body.match_date = match_date;
-      body.match_time = match_time;
+      const body: any = {
+        match_date: isoDate,
+        match_time: finalTime
+      };
 
       if (home_goals !== null || away_goals !== null) {
         body.result = {
@@ -229,43 +252,24 @@ export default function AdminFixturesPage() {
         return;
       }
 
-      // Nakon uspješnog spremanja, pozovi rekalkulaciju standingsa ZA TAJ SUSRET
-      try {
-        await fetch(
-          `/api/recalculate-standings?fixtureId=${selectedFixture.id}`,
-          {
-            // pretpostavka: endpoint prihvaća GET; ako traži POST, promijeni method
-            method: 'GET'
-          }
-        );
-      } catch (recalcErr) {
-        console.error('Greška pri rekalkulaciji ljestvice', recalcErr);
-        // ne rušimo spremanje, ali javimo da recalc možda nije prošao
-        setInfoMessage(
-          'Promjene su spremljene, ali je možda došlo do greške pri rekalkulaciji ljestvice – provjeri standings.'
-        );
-      }
+      // pokreni rekalkulaciju
+      await fetch(`/api/recalculate-standings?fixtureId=${selectedFixture.id}`);
 
-      // osvježi listu susreta u tablici (lokalno)
-      const updatedFixtures = fixtures.map((f) => {
-        if (f.id !== selectedFixture.id) return f;
-        return {
-          ...f,
-          match_date,
-          match_time,
-          result: {
-            ...f.result,
-            home_goals,
-            away_goals
-          }
-        };
-      });
+      // update UI lokalno
+      const updatedFixtures = fixtures.map((f) =>
+        f.id === selectedFixture.id
+          ? {
+              ...f,
+              match_date: isoDate,
+              match_time: finalTime,
+              result: { home_goals, away_goals }
+            }
+          : f
+      );
+
       setFixtures(updatedFixtures);
-
       setInfoMessage('Promjene spremljene i rekalkulacija pokrenuta.');
       setSaving(false);
-      // po želji možeš zatvoriti modal:
-      // closeEditModal();
     } catch (err) {
       console.error(err);
       setError('Neočekivana greška pri spremanju promjena.');
@@ -273,117 +277,106 @@ export default function AdminFixturesPage() {
     }
   }
 
+  // -------------- UI ------------------
+
   return (
     <div className="p-4 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">
-        Modifikacija susreta (kola)
-      </h1>
+      <h1 className="text-2xl font-bold mb-4">Modifikacija susreta (kola)</h1>
 
-      {/* FILTRI */}
-      <div className="border rounded-lg p-4 mb-6 space-y-4">
+      {/* FILTERI */}
+      <div className="border rounded-lg p-4 mb-6 space-y-4 bg-[#f7f1e6]">
         <h2 className="font-semibold mb-2">Filteri</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Liga (league_code)
-            </label>
+          {/* Liga */}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">Liga (league_code)</label>
             <input
               type="text"
               value={leagueCode}
               onChange={(e) => setLeagueCode(e.target.value)}
               placeholder="npr. PIONIRI_REG"
-              className="border rounded px-2 py-1 w-full"
+              className="border rounded px-2 py-2 w-full"
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Kolo (round)
-            </label>
+          {/* Kolo */}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">Kolo (round)</label>
             <input
               type="number"
               value={round}
               onChange={(e) => setRound(e.target.value)}
               placeholder="npr. 3"
-              className="border rounded px-2 py-1 w-full"
+              className="border rounded px-2 py-2 w-full"
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Pretraži klub (po nazivu)
-            </label>
+          {/* Klub */}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">Pretraži klub</label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={teamSearch}
                 onChange={(e) => setTeamSearch(e.target.value)}
                 placeholder="npr. Buna"
-                className="border rounded px-2 py-1 flex-1"
+                className="border rounded px-2 py-2 flex-1"
               />
               <button
-                type="button"
                 onClick={handleSearchTeams}
-                className="px-3 py-1 border rounded bg-gray-100 text-sm"
+                className="px-4 py-2 border rounded bg-white text-sm"
               >
-                {loadingTeams ? 'Tražim...' : 'Traži klub'}
+                {loadingTeams ? '...' : 'Traži'}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Rezultati pretrage klubova */}
+        {/* Rezultati klubova */}
         {teamOptions.length > 0 && (
-          <div className="mt-3">
-            <p className="text-sm mb-1">Odaberi klub za filtriranje:</p>
+          <>
+            <p className="text-sm mt-3 mb-1">Odaberi klub:</p>
             <div className="flex flex-wrap gap-2">
               {teamOptions.map((t) => (
                 <button
                   key={t.id}
-                  type="button"
                   onClick={() => setSelectedTeam(t)}
                   className={`px-3 py-1 text-sm rounded border ${
-                    selectedTeam?.id === t.id
-                      ? 'bg-green-600 text-white'
-                      : 'bg-white'
+                    selectedTeam?.id === t.id ? 'bg-green-600 text-white' : 'bg-white'
                   }`}
                 >
                   {t.name} ({t.league_code})
                 </button>
               ))}
             </div>
-          </div>
+          </>
         )}
 
-        {/* Gumb za pretragu susreta */}
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={handleSearchFixtures}
-            className="px-4 py-2 rounded bg-green-700 text-white text-sm"
-            disabled={loading}
-          >
-            {loading ? 'Pretražujem...' : 'Pretraži susrete'}
-          </button>
-        </div>
+        <button
+          onClick={handleSearchFixtures}
+          className="px-6 py-2 rounded bg-green-700 text-white text-sm mt-4"
+          disabled={loading}
+        >
+          {loading ? 'Pretražujem...' : 'Pretraži susrete'}
+        </button>
       </div>
 
-      {/* Poruke */}
+      {/* PORUKE */}
       {error && (
-        <div className="mb-4 text-sm text-red-600 border border-red-200 bg-red-50 px-3 py-2 rounded">
+        <div className="mb-4 text-sm text-red-700 bg-red-100 px-3 py-2 rounded border">
           {error}
         </div>
       )}
 
       {infoMessage && (
-        <div className="mb-4 text-sm text-blue-700 border border-blue-200 bg-blue-50 px-3 py-2 rounded">
+        <div className="mb-4 text-sm text-blue-700 bg-blue-100 px-3 py-2 rounded border">
           {infoMessage}
         </div>
       )}
 
-      {/* TABLICA SUSRETA */}
-      <div className="border rounded-lg overflow-hidden">
+      {/* TABLICA */}
+      <div className="border rounded-lg overflow-hidden bg-white">
         <table className="w-full text-sm">
           <thead className="bg-gray-100">
             <tr>
@@ -397,13 +390,11 @@ export default function AdminFixturesPage() {
               <th className="p-2 border-b text-left">Akcija</th>
             </tr>
           </thead>
+
           <tbody>
             {fixtures.length === 0 && !loading && (
               <tr>
-                <td
-                  colSpan={8}
-                  className="p-3 text-center text-gray-500 text-sm"
-                >
+                <td colSpan={8} className="p-3 text-center text-gray-500">
                   Nema podataka.
                 </td>
               </tr>
@@ -412,27 +403,22 @@ export default function AdminFixturesPage() {
             {fixtures.map((f) => (
               <tr key={f.id} className="hover:bg-gray-50">
                 <td className="p-2 border-b">
-                  {formatDateForInput(f.match_date)}
+                  {formatDateToCro(f.match_date)}
                 </td>
                 <td className="p-2 border-b">
-                  {f.match_time ? f.match_time.slice(0, 5) : ''}
+                  {formatTimeToCro(f.match_time)}
                 </td>
                 <td className="p-2 border-b">{f.league_code}</td>
                 <td className="p-2 border-b">{f.round}</td>
+                <td className="p-2 border-b">{f.home?.name}</td>
+                <td className="p-2 border-b">{f.away?.name}</td>
                 <td className="p-2 border-b">
-                  {f.home?.name || `#${f.home_team_id}`}
-                </td>
-                <td className="p-2 border-b">
-                  {f.away?.name || `#${f.away_team_id}`}
-                </td>
-                <td className="p-2 border-b">
-                  {f.result && f.result.home_goals != null && f.result.away_goals != null
+                  {f.result && f.result.home_goals != null
                     ? `${f.result.home_goals}:${f.result.away_goals}`
                     : '-'}
                 </td>
                 <td className="p-2 border-b">
                   <button
-                    type="button"
                     onClick={() => openEditModal(f)}
                     className="px-3 py-1 text-xs rounded border bg-white hover:bg-gray-100"
                   >
@@ -453,48 +439,46 @@ export default function AdminFixturesPage() {
               Uredi susret #{selectedFixture.id}
             </h2>
 
-            <p className="text-sm mb-2 text-gray-700">
-              {selectedFixture.home?.name || `#${selectedFixture.home_team_id}`}{' '}
-              vs{' '}
-              {selectedFixture.away?.name || `#${selectedFixture.away_team_id}`}
+            <p className="text-sm mb-4 text-gray-700">
+              {selectedFixture.home?.name} vs {selectedFixture.away?.name}
               <br />
-              Liga: {selectedFixture.league_code} | Kolo:{' '}
-              {selectedFixture.round}
+              Liga: {selectedFixture.league_code} | Kolo: {selectedFixture.round}
             </p>
 
             <div className="space-y-3 mb-4">
+              {/* Datum */}
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Datum
-                </label>
+                <label className="block text-sm font-medium mb-1">Datum</label>
                 <input
-                  type="date"
+                  type="text"
                   value={editState.match_date}
                   onChange={(e) =>
                     setEditState((prev) =>
                       prev ? { ...prev, match_date: e.target.value } : prev
                     )
                   }
-                  className="border rounded px-2 py-1 w-full"
+                  placeholder="dd.mm.yyyy."
+                  className="border rounded px-2 py-2 w-full"
                 />
               </div>
 
+              {/* Vrijeme */}
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Vrijeme (HH:MM)
-                </label>
+                <label className="block text-sm font-medium mb-1">Vrijeme</label>
                 <input
-                  type="time"
+                  type="text"
                   value={editState.match_time}
                   onChange={(e) =>
                     setEditState((prev) =>
                       prev ? { ...prev, match_time: e.target.value } : prev
                     )
                   }
-                  className="border rounded px-2 py-1 w-full"
+                  placeholder="HH:MM"
+                  className="border rounded px-2 py-2 w-full"
                 />
               </div>
 
+              {/* Golovi */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium mb-1">
@@ -503,17 +487,16 @@ export default function AdminFixturesPage() {
                   <input
                     type="number"
                     value={editState.home_goals}
+                    min={0}
                     onChange={(e) =>
                       setEditState((prev) =>
-                        prev
-                          ? { ...prev, home_goals: e.target.value }
-                          : prev
+                        prev ? { ...prev, home_goals: e.target.value } : prev
                       )
                     }
-                    className="border rounded px-2 py-1 w-full"
-                    min={0}
+                    className="border rounded px-2 py-2 w-full"
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Golovi gosta
@@ -521,45 +504,43 @@ export default function AdminFixturesPage() {
                   <input
                     type="number"
                     value={editState.away_goals}
+                    min={0}
                     onChange={(e) =>
                       setEditState((prev) =>
-                        prev
-                          ? { ...prev, away_goals: e.target.value }
-                          : prev
+                        prev ? { ...prev, away_goals: e.target.value } : prev
                       )
                     }
-                    className="border rounded px-2 py-1 w-full"
-                    min={0}
+                    className="border rounded px-2 py-2 w-full"
                   />
                 </div>
               </div>
             </div>
 
+            {/* Poruke */}
             {error && (
-              <div className="mb-2 text-xs text-red-600 border border-red-200 bg-red-50 px-2 py-1 rounded">
+              <div className="mb-2 text-xs text-red-600 bg-red-100 border px-2 py-1 rounded">
                 {error}
               </div>
             )}
 
             {infoMessage && (
-              <div className="mb-2 text-xs text-blue-700 border border-blue-200 bg-blue-50 px-2 py-1 rounded">
+              <div className="mb-2 text-xs text-blue-700 bg-blue-100 border px-2 py-1 rounded">
                 {infoMessage}
               </div>
             )}
 
             <div className="flex justify-end gap-2 mt-2">
               <button
-                type="button"
                 onClick={closeEditModal}
-                className="px-3 py-1 text-sm border rounded bg-gray-100"
+                className="px-3 py-2 text-sm border rounded bg-gray-200"
                 disabled={saving}
               >
                 Zatvori
               </button>
+
               <button
-                type="button"
                 onClick={handleSaveChanges}
-                className="px-4 py-1 text-sm rounded bg-green-700 text-white"
+                className="px-4 py-2 text-sm rounded bg-green-700 text-white"
                 disabled={saving}
               >
                 {saving ? 'Spremam...' : 'Spremi i ažuriraj'}
