@@ -117,7 +117,7 @@ export default function AdminPage() {
     if (league) loadFixtures(league);
   }
 
-  // LOGIN SCREEN
+  // LOGIN
   if (!authorized) {
     return (
       <form
@@ -168,7 +168,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* -------- SELECT LIGE -------- */}
+      {/* LIGA */}
       <div className="bg-[#f7f1e6] p-4 rounded-xl border border-[#c8b59a] text-center">
         <label className="font-semibold text-[#0A5E2A]">Odaberi ligu:</label>
 
@@ -192,7 +192,7 @@ export default function AdminPage() {
         </select>
       </div>
 
-      {/* -------- VIEW SWITCH -------- */}
+      {/* VIEW SWITCH */}
       {league && (
         <div className="flex gap-4 justify-center">
           <button
@@ -219,20 +219,21 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* -------- MAIN CONTENT -------- */}
       {loading && <div>Učitavanje...</div>}
 
       {league && !loading && (
         <div>
-          {/* ACTUAL + ALL rounds remain unchanged */}
-          {/* DA NE GUŠIM ODGOVOR, OVAJ SREDIŠNJI DIO TVOG KODA OSTAVLJAM IDENTIČAN */}
+          {/* ——————————————————————
+              OVDJE JE TVOJ OSTATAK KODA
+              (REZULTATI, UNOSI, TABLICE…)
+              —————————————————————— */}
         </div>
       )}
 
-      {/* -------- IZVJEŠTAJ GUMBI -------- */}
+      {/* GUMBI — PDF, ARHIVA, BACKUP + NOVI GUMB */}
       <div className="flex justify-end mt-10">
 
-        {/* ZELENI – auto PDF print */}
+        {/* PDF */}
         <button
           onClick={() => window.open("/api/report?print=1", "_blank")}
           className="px-4 py-2 text-white rounded-full cursor-pointer bg-[#0A5E2A] hover:bg-[#08471f] shadow mr-4"
@@ -240,7 +241,7 @@ export default function AdminPage() {
           📄 Generiraj PDF izvještaj
         </button>
 
-        {/* BEŽ – spremanje u arhivu */}
+        {/* ARHIVA */}
         <button
           onClick={() => window.open("/api/report?raw=1", "_blank")}
           className="px-4 py-2 rounded-full cursor-pointer bg-[#e8dfd0] border border-[#c8b59a] text-[#0A5E2A] shadow mr-4"
@@ -248,13 +249,24 @@ export default function AdminPage() {
           💾 Spremi u arhivu (HTML)
         </button>
 
-        {/* Postojeći backup gumb */}
+        {/* BACKUP */}
         <button
           onClick={() => (window.location.href = "/admin/backup")}
-          className="px-4 py-2 text-white rounded-full cursor-pointer bg-[#f37c22] hover:bg-[#d96d1c] shadow"
+          className="px-4 py-2 text-white rounded-full cursor-pointer bg-[#f37c22] hover:bg-[#d96d1c] shadow mr-4"
         >
           🟧 Napredno: Backup sustav
         </button>
+
+        {/* ———————————————— */}
+        {/* ⚠️ NOVI GUMB — TOČKA 6 */}
+        {/* ———————————————— */}
+        <button
+          onClick={() => (window.location.href = "/admin/fixtures")}
+          className="px-4 py-2 rounded-full cursor-pointer bg-blue-600 hover:bg-blue-700 text-white shadow"
+        >
+          🔧 Modifikacija susreta
+        </button>
+
       </div>
     </div>
   );
