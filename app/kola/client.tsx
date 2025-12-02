@@ -1,4 +1,3 @@
-// app/kola/client.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -36,7 +35,7 @@ export default function ClientKola({ leagueCode }: { leagueCode: string }) {
         match_time,
         home:home_team_id ( name ),
         away:away_team_id ( name ),
-        results:results ( home_goals, away_goals )
+        result:results!fixture_id ( home_goals, away_goals )
       `
       )
       .eq("league_code", leagueCode)
@@ -53,8 +52,6 @@ export default function ClientKola({ leagueCode }: { leagueCode: string }) {
       const homeRel = Array.isArray(f.home) ? f.home[0] : f.home;
       const awayRel = Array.isArray(f.away) ? f.away[0] : f.away;
 
-      const result = f.results?.[0] || null;
-
       return {
         id: f.id,
         round: f.round || 0,
@@ -62,8 +59,8 @@ export default function ClientKola({ leagueCode }: { leagueCode: string }) {
         match_time: f.match_time,
         home_team: homeRel?.name ?? "",
         away_team: awayRel?.name ?? "",
-        home_goals: result ? result.home_goals : null,
-        away_goals: result ? result.away_goals : null,
+        home_goals: f.result?.home_goals ?? null,
+        away_goals: f.result?.away_goals ?? null,
       };
     });
 
@@ -84,7 +81,10 @@ export default function ClientKola({ leagueCode }: { leagueCode: string }) {
       {Object.keys(grouped)
         .sort((a, b) => Number(a) - Number(b))
         .map((round) => (
-          <div key={round} className="rounded-xl border border-[#e2d5bd] bg-[#f7f1e6] p-4">
+          <div
+            key={round}
+            className="rounded-xl border border-[#e2d5bd] bg-[#f7f1e6] p-4"
+          >
             <h2 className="text-xl font-bold text-[#0b5b2a] mb-3">
               {round}. kolo
             </h2>
@@ -120,11 +120,9 @@ export default function ClientKola({ leagueCode }: { leagueCode: string }) {
                       </div>
                     </div>
 
-                    <div className="text-sm font-bold text-[#0b5b2a]">
+                    <div className="text-sm font-bold text-[#0b5b2a] min-w-[40px] text-center">
                       {hasResult ? (
-                        <span>
-                          {m.home_goals}:{m.away_goals}
-                        </span>
+                        <span>{m.home_goals}:{m.away_goals}</span>
                       ) : (
                         <span className="text-gray-500">—</span>
                       )}
