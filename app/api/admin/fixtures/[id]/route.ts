@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 interface UpdateFixtureBody {
-  match_date?: string | null; // ISO date string
-  match_time?: string | null; // HH:MM
+  match_date?: string | null; // ISO (YYYY-MM-DD)
+  match_time?: string | null; // HH:MM (24h)
   result?: {
     home_goals: number | null;
     away_goals: number | null;
@@ -44,19 +44,20 @@ export async function PUT(
   }
 
   try {
-    // 1) Update fixtures (datum/vrijeme)
-    if (match_date || match_time) {
-      const updateData: Record<string, any> = {};
+    // ----------------- 1) UPDATE FIXTURE -----------------
+    if (match_date !== undefined || match_time !== undefined) {
+      const updateData: any = {};
+
       if (match_date !== undefined) updateData.match_date = match_date;
       if (match_time !== undefined) updateData.match_time = match_time;
 
-      const { error: updateFixtureError } = await supabaseAdmin
+      const { error: updateErr } = await supabaseAdmin
         .from('fixtures')
         .update(updateData)
         .eq('id', fixtureId);
 
-      if (updateFixtureError) {
-        console.error('Error updating fixture', updateFixtureError);
+      if (updateErr) {
+        console.error('Error updating fixture', updateErr);
         return NextResponse.json(
           { error: 'Greška pri ažuriranju susreta.' },
           { status: 500 }
@@ -64,11 +65,11 @@ export async function PUT(
       }
     }
 
-    // 2) Upsert rezultat (results)
+    // ----------------- 2) UPSERT REZULTAT -----------------
     if (result) {
       const { home_goals, away_goals } = result;
 
-      const { error: upsertError } = await supabaseAdmin
+      const { error: upsertErr } = await supabaseAdmin
         .from('results')
         .upsert(
           {
@@ -79,8 +80,8 @@ export async function PUT(
           { onConflict: 'fixture_id' }
         );
 
-      if (upsertError) {
-        console.error('Error upserting result', upsertError);
+      if (upsertErr) {
+        console.error('Error upserting result', upsertErr);
         return NextResponse.json(
           { error: 'Greška pri spremanju rezultata.' },
           { status: 500 }
@@ -88,10 +89,10 @@ export async function PUT(
       }
     }
 
-    // 3) Vrati OK – rekalkulacija standings ide preko frontenda pozivom
+    // --------------- GOTOVO -----------------
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('Exception in PUT /api/admin/fixtures/[id]', err);
+    console.error('Exception:', err);
     return NextResponse.json(
       { error: 'Neočekivana greška.' },
       { status: 500 }
