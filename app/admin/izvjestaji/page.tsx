@@ -1,3 +1,4 @@
+// app/admin/izvjestaji/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -13,14 +14,14 @@ type GroupedReports = {
   [season: string]: Report[];
 };
 
-const TOTAL_ROUNDS = 11;
+const MAX_ROUNDS = 11; // broj kola u sezoni
 
 export default function AdminReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedRound, setSelectedRound] = useState<string>(""); // odabrano kolo
+  const [selectedRound, setSelectedRound] = useState<string>("");
 
   // ---- LOAD REPORTS ----
   async function loadReports() {
@@ -46,26 +47,18 @@ export default function AdminReportsPage() {
 
   // ---- GENERATE NEW REPORT ----
   async function handleGenerate() {
-    setError(null);
-
     if (!selectedRound) {
       setError("Odaberi kolo za koje želiš generirati izvještaj.");
       return;
     }
 
-    const roundNumber = Number(selectedRound);
-    if (!Number.isFinite(roundNumber) || roundNumber < 1 || roundNumber > TOTAL_ROUNDS) {
-      setError("Neispravan broj kola.");
-      return;
-    }
-
     setGenerating(true);
-
+    setError(null);
     try {
       const res = await fetch("/api/reports/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ round: roundNumber }),
+        body: JSON.stringify({ round: Number(selectedRound) }),
       });
 
       if (!res.ok) {
@@ -75,12 +68,11 @@ export default function AdminReportsPage() {
 
       const data = await res.json();
 
-      // otvori novi tab s HTML-om koji odmah ide na print
       if (data?.id) {
+        // otvori novi tab s HTML-om koji odmah ide na print
         window.open(`/api/reports/${data.id}?print=1`, "_blank");
       }
 
-      // osvježi listu
       await loadReports();
     } catch (err: any) {
       setError(err.message || "Greška pri generiranju izvještaja");
@@ -115,10 +107,8 @@ export default function AdminReportsPage() {
     return acc;
   }, {} as GroupedReports);
 
-  // sortiraj sezone (desc)
   const seasons = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
 
-  // helper za formatiranje datuma/vremena
   function formatDateTime(iso: string) {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
@@ -137,10 +127,9 @@ export default function AdminReportsPage() {
     const dd = String(d.getDate()).padStart(2, "0");
     const hh = String(d.getHours()).padStart(2, "0");
     const min = String(d.getMinutes()).padStart(2, "0");
-    return `izvjestaj_kolo_${r.round}_${yyyy}-${mm}-${dd}_${hh}-${min}.pdf`;
+    return `izvjestaj_kolo_${r.round}_${yyyy}-${mm}-${dd}_${hh}-${min}.html`;
   }
 
-  // ---- MAIN UI ----
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
       {/* HEADER */}
@@ -154,43 +143,38 @@ export default function AdminReportsPage() {
           </p>
         </div>
 
-        <div className="flex flex-col items-stretch sm:flex-row sm:items-center gap-3">
-
-          {/* Odabir kola */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-[#0A5E2A] font-medium">
-              Kolo:
-            </label>
-            <select
-              value={selectedRound}
-              onChange={(e) => setSelectedRound(e.target.value)}
-              className="border border-[#c8b59a] rounded-full px-3 py-1.5 text-sm bg-white"
-            >
-              <option value="">— odaberi —</option>
-              {Array.from({ length: TOTAL_ROUNDS }, (_, i) => i + 1).map((r) => (
-                <option key={r} value={r}>
-                  {r}. kolo
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Gumb za generiranje */}
-          <button
-            onClick={handleGenerate}
-            disabled={generating || !selectedRound}
-            className="px-4 py-2 text-white rounded-full cursor-pointer bg-[#0A5E2A] hover:bg-[#08471f] shadow text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {generating ? "Generiram..." : "📄 Generiraj izvještaj"}
-          </button>
-
-          {/* Natrag na admin */}
+        <div className="flex flex-col items-stretch sm:flex-row sm:items-center gap-2">
           <button
             onClick={() => (window.location.href = "/admin")}
             className="px-4 py-2 rounded-full cursor-pointer bg-[#f7f1e6] border border-[#c8b59a] text-[#0A5E2A] shadow text-sm"
           >
             ← Natrag na Admin panel
           </button>
+
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedRound}
+              onChange={(e) => setSelectedRound(e.target.value)}
+              className="px-3 py-2 rounded-full border border-[#c8b59a] bg-white text-sm"
+            >
+              <option value="">Kolo...</option>
+              {Array.from({ length: MAX_ROUNDS }, (_, i) => i + 1).map(
+                (r) => (
+                  <option key={r} value={r}>
+                    {r}. kolo
+                  </option>
+                )
+              )}
+            </select>
+
+            <button
+              onClick={handleGenerate}
+              disabled={generating}
+              className="px-4 py-2 text-white rounded-full cursor-pointer bg-[#0A5E2A] hover:bg-[#08471f] shadow text-sm disabled:opacity-60"
+            >
+              {generating ? "Generiram..." : "📄 Generiraj izvještaj"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -202,7 +186,6 @@ export default function AdminReportsPage() {
 
       {loading && <div>Učitavanje arhive...</div>}
 
-      {/* SEASONS + TIMELINE */}
       {!loading && seasons.length === 0 && (
         <div className="text-sm text-gray-600">
           Još nema nijednog spremljenog izvještaja u arhivi.
@@ -212,7 +195,6 @@ export default function AdminReportsPage() {
       {!loading &&
         seasons.map((season) => {
           const reps = grouped[season].slice().sort((a, b) => {
-            // noviji gore
             return (
               new Date(b.created_at).getTime() -
               new Date(a.created_at).getTime()
