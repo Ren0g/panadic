@@ -5,7 +5,6 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Regularne lige
 const LEAGUES = [
   { db: "PIONIRI_REG", label: "Pioniri" },
   { db: "MLPIONIRI_REG", label: "Mlađi pioniri" },
@@ -14,41 +13,30 @@ const LEAGUES = [
   { db: "POC_REG_B", label: "Početnici B" },
 ];
 
-// Datum HR format
-function hrDate(str: string | null): string {
-  if (!str) return "";
-  const [y, m, d] = str.split("-");
-  return `${d}.${m}.${y}.`;
-}
+const hrDate = (str: string | null) =>
+  !str ? "" : `${str.split("-")[2]}.${str.split("-")[1]}.${str.split("-")[0]}.`;
 
-// Vrijeme HR format
-function hrTime(t: string | null): string {
-  return t ? t.slice(0, 5) : "";
-}
+const hrTime = (t: string | null) => (t ? t.slice(0, 5) : "");
 
 export async function POST(request: Request) {
   try {
     const url = new URL(request.url);
-    const roundParam = url.searchParams.get("round");
-    const round = Number(roundParam);
-
-    if (!round || isNaN(round)) {
+    const round = Number(url.searchParams.get("round"));
+    if (!round || isNaN(round))
       return new NextResponse("Nedostaje broj kola.", { status: 400 });
-    }
 
     const season = "2025/26";
 
-    // --- 1. PODACI ---
-    const [
-      { data: teamsData },
-      { data: fixturesRaw },
-      { data: standingsData },
-    ] = await Promise.all([
-      supabase.from("teams").select("id, name"),
-      supabase
-        .from("fixtures")
-        .select(
-          `
+    // ───────────────────────────────
+    // 1. DOHVAT BAZE
+    // ───────────────────────────────
+    const [{ data: teams }, { data: fixturesRaw }, { data: standings }] =
+      await Promise.all([
+        supabase.from("teams").select("id, name"),
+        supabase
+          .from("fixtures")
+          .select(
+            `
           id,
           league_code,
           round,
@@ -58,44 +46,38 @@ export async function POST(request: Request) {
           away_team_id,
           results:results ( home_goals, away_goals )
         `
-        )
-        .eq("round", round)
-        .order("league_code")
-        .order("match_date")
-        .order("match_time"),
-      supabase.from("standings").select("*"),
-    ]);
+          )
+          .eq("round", round)
+          .order("match_date")
+          .order("match_time"),
+        supabase.from("standings").select("*"),
+      ]);
 
-    if (!teamsData || !fixturesRaw || !standingsData) {
+    if (!teams || !fixturesRaw || !standings)
       return new NextResponse("Greška pri dohvaćanju podataka.", {
         status: 500,
       });
-    }
-
-    const fixtures = fixturesRaw as any[];
-    const standings = standingsData as any[];
 
     const teamName = new Map<number, string>();
-    (teamsData as any[]).forEach((t: any) => teamName.set(t.id, t.name));
+    teams.forEach((t) => teamName.set(t.id, t.name));
 
-    // Helper – HTML escape
     const esc = (s: string) =>
       s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-    // --- RENDER FUNKCIJE ---
+    // ───────────────────────────────
+    // 2. FUNKCIJE ZA RENDER
+    // ───────────────────────────────
 
-    const renderResultsTable = (league: string): string => {
-      const fx = fixtures.filter((f) => f.league_code === league);
+    const renderResultsTable = (league: string) => {
+      const fx = fixturesRaw.filter((f) => f.league_code === league);
 
-      if (fx.length === 0) {
-        return `<p>Nema utakmica u ovom kolu.</p>`;
-      }
+      if (fx.length === 0) return `<p>Nema utakmica u ovom kolu.</p>`;
 
       const rows = fx
         .map((f, i) => {
-          const r = f.results?.[0];
+          const r = f.results?.[0]; // prvo spremanje
           const score =
-            r && r.home_goals != null && r.away_goals != null
+            r && r.home_goals !== null && r.away_goals !== null
               ? `${r.home_goals}:${r.away_goals}`
               : "-:-";
 
@@ -122,12 +104,11 @@ export async function POST(request: Request) {
       `;
     };
 
-    const renderStandingsTable = (league: string): string => {
+    const renderStandingsTable = (league: string) => {
       const st = standings.filter((s) => s.league_code === league);
-
       if (st.length === 0) return `<p>Nema tablice.</p>`;
 
-      const enr = st
+      const sorted = st
         .map((s) => ({ ...s, name: teamName.get(s.team_id) || "" }))
         .sort(
           (a, b) =>
@@ -137,7 +118,7 @@ export async function POST(request: Request) {
             a.name.localeCompare(b.name)
         );
 
-      const rows = enr
+      const rows = sorted
         .map(
           (s, i) => `
         <tr ${i % 2 ? `class="shaded"` : ""}>
@@ -176,21 +157,17 @@ export async function POST(request: Request) {
       `;
     };
 
-    // --- NEXT ROUND (round+1) ---
-    const [{ data: nextFixturesRaw }] = await Promise.all([
-      supabase
-        .from("fixtures")
-        .select("*")
-        .eq("round", round + 1)
-        .order("match_date")
-        .order("match_time"),
-    ]);
+    const { data: nextRaw } = await supabase
+      .from("fixtures")
+      .select("*")
+      .eq("round", round + 1)
+      .order("match_date")
+      .order("match_time");
 
-    const nextFixtures = (nextFixturesRaw as any[]) || [];
+    const nextFixtures = nextRaw || [];
 
-    const renderNextRoundTable = (league: string): string => {
+    const renderNextRoundTable = (league: string) => {
       const fx = nextFixtures.filter((f: any) => f.league_code === league);
-
       if (fx.length === 0) return `<p>Nema rasporeda.</p>`;
 
       const rows = fx
@@ -220,22 +197,21 @@ export async function POST(request: Request) {
       `;
     };
 
-    // --- HTML ---
+    // ───────────────────────────────
+    // 3. HTML
+    // ───────────────────────────────
+
     const leaguesHtml = LEAGUES.map(
       (lg) => `
       <section class="league-section">
         <h2>${lg.label}</h2>
-
         <h3>Rezultati ${round}. kola</h3>
         ${renderResultsTable(lg.db)}
-
         <h3>Tablica nakon ${round}. kola</h3>
         ${renderStandingsTable(lg.db)}
-
         <h3>Iduće kolo (${round + 1}. kolo)</h3>
         ${renderNextRoundTable(lg.db)}
-      </section>
-    `
+      </section>`
     ).join("");
 
     const title = `izvjestaj_kolo_${round}`;
@@ -244,24 +220,24 @@ export async function POST(request: Request) {
 <!DOCTYPE html>
 <html lang="hr">
 <head>
-  <meta charset="UTF-8" />
-  <title>${title}</title>
-  <meta name="file-name" content="${title}.pdf" />
-  <style>
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 40px; color:#222; }
-    h1 { text-align:center; color:#0A5E2A; }
-    h2 { text-align:center; color:#0A5E2A; margin-top:40px; }
-    h3 { color:#0A5E2A; margin-top:20px; margin-bottom:8px; }
-    table { width:100%; border-collapse:collapse; margin-bottom:20px; font-size:12px; table-layout: fixed; }
-    th, td { padding:4px 6px; border-bottom:1px solid #eee; }
-    th { background:#FFF0E6; color:#F37C22; }
-    td.left { text-align:left; }
-    td.center { text-align:center; }
-    .shaded { background:#FFF8F2; }
-    .league-section { page-break-after:always; }
-    .league-section:last-of-type { page-break-after:auto; }
-    footer { text-align:center; margin-top:40px; color:#F37C22; font-size:12px; }
-  </style>
+<meta charset="UTF-8" />
+<title>${title}</title>
+<meta name="file-name" content="${title}.pdf" />
+<style>
+  body { font-family: system-ui; margin: 40px; color:#222; }
+  h1 { text-align:center; color:#0A5E2A; }
+  h2 { text-align:center; color:#0A5E2A; margin-top:40px; }
+  h3 { color:#0A5E2A; margin-top:25px; margin-bottom:8px; }
+  table { width:100%; border-collapse:collapse; margin-bottom:20px; font-size:12px; }
+  th, td { padding:4px 6px; border-bottom:1px solid #eee; }
+  th { background:#FFF0E6; color:#F37C22; }
+  td.left { text-align:left; }
+  td.center { text-align:center; }
+  .shaded { background:#FFF8F2; }
+  .league-section { page-break-after:always; }
+  .league-section:last-of-type { page-break-after:auto; }
+  footer { text-align:center; margin-top:60px; color:#F37C22; font-size:12px; }
+</style>
 </head>
 
 <body data-round="${round}">
@@ -277,20 +253,20 @@ export async function POST(request: Request) {
 </html>
 `;
 
-    // SPREMI U BAZU
-    const { data: inserted, error: insertError } = await supabase
+    // ───────────────────────────────
+    // 4. SPREMI
+    // ───────────────────────────────
+
+    const { data: inserted, error } = await supabase
       .from("reports")
-      .insert({
-        season,
-        round,
-        html,
-      })
+      .insert({ season, round, html })
       .select("id, season, round, created_at")
       .single();
 
-    if (insertError || !inserted) {
-      return new NextResponse("Greška pri spremanju arhive", { status: 500 });
-    }
+    if (error || !inserted)
+      return new NextResponse("Greška pri spremanju arhive", {
+        status: 500,
+      });
 
     return NextResponse.json(inserted);
   } catch (e) {
