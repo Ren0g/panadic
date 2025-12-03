@@ -1,9 +1,6 @@
+// app/api/reports/[id]/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type Params = {
   params: {
@@ -20,7 +17,7 @@ export async function GET(request: Request, { params }: Params) {
     return new NextResponse("Neispravan id", { status: 400 });
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("reports")
     .select("html, round")
     .eq("id", id)
@@ -34,8 +31,8 @@ export async function GET(request: Request, { params }: Params) {
   let html: string = data.html;
 
   if (print) {
-    // jednostavno ubaci window.print() prije </body>
-    const script = `<script>window.onload = function(){ window.print(); };</script>`;
+    const script =
+      `<script>window.onload = function(){ window.print(); };</script>`;
     if (html.includes("</body>")) {
       html = html.replace("</body>", `${script}</body>`);
     } else {
