@@ -1,3 +1,4 @@
+// app/api/reports/generate/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -14,11 +15,6 @@ const LEAGUES = [
   { db: "POC_REG_B", label: "Početnici B" },
 ];
 
-type FixtureResultRow = {
-  home_goals: number | null;
-  away_goals: number | null;
-};
-
 type FixtureRow = {
   id: number;
   league_code: string;
@@ -27,7 +23,7 @@ type FixtureRow = {
   match_time: string | null;
   home_team_id: number;
   away_team_id: number;
-  results: FixtureResultRow[] | null;
+  results: { home_goals: number | null; away_goals: number | null }[] | null;
 };
 
 type StandingRow = {
@@ -45,30 +41,36 @@ type StandingRow = {
   group_code: string | null;
 };
 
-// HR DATUM – iz "2025-12-06" u "06.12.2025."
 function hrDate(str: string | null): string {
   if (!str) return "";
-  const [y, m, d] = str.split("-");
+  const parts = str.split("-");
+  if (parts.length !== 3) return str;
+  const [y, m, d] = parts;
   return `${d}.${m}.${y}.`;
 }
 
-// HR VRIJEME – "17:18:00" -> "17:18"
 function hrTime(t: string | null): string {
-  return t?.slice(0, 5) ?? "";
+  if (!t) return "";
+  if (t.length >= 5) return t.slice(0, 5);
+  return t;
 }
 
 function esc(str: string) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function latestResult(
-  results: FixtureResultRow[] | null | undefined
-): FixtureResultRow | null {
-  if (!results || results.length === 0) return null;
-  return results[results.length - 1];
-}
-
 export async function POST(request: Request) {
+  // 0) PROČITAJ KOLO IZ BODY-JA (OPTIONAL)
+  let requestedRound: number | null = null;
+  try {
+    const body = await request.json();
+    if (body && typeof body.round === "number" && Number.isFinite(body.round)) {
+      requestedRound = body.round;
+    }
+  } catch {
+    // nema body-ja, nije problem
+  }
+
   // 1) PODACI
   const [
     { data: teamsData, error: teamsError },
@@ -120,29 +122,31 @@ export async function POST(request: Request) {
   const teamName = new Map<number, string>();
   teamsData.forEach((t: any) => teamName.set(t.id, t.name));
 
-  // 2) ZADNJE KOLO (po zadnjem rezultatu)
-  const fixturesWithResult = fixtures.filter((f) => {
-    const r = latestResult(f.results);
-    return r && r.home_goals !== null && r.away_goals !== null;
-  });
+  // 2) AK NIJE ZADANO KOLO → UZMI NAJVEĆE KOLO ZA KOJE POSTOJI BAREM JEDAN REZULTAT
+  let reportRound: number;
+  if (requestedRound && requestedRound > 0) {
+    reportRound = requestedRound;
+  } else {
+    const fixturesWithResult = fixtures.filter((f) => {
+      const r = f.results?.[0];
+      return r && r.home_goals !== null && r.away_goals !== null;
+    });
 
-  if (fixturesWithResult.length === 0) {
-    return new NextResponse("Još nema odigranih utakmica.", { status: 400 });
+    let lastRound = 1;
+    for (const f of fixturesWithResult) {
+      if (f.round > lastRound) lastRound = f.round;
+    }
+    reportRound = lastRound;
   }
 
-  let lastRound = 1;
-  for (const f of fixturesWithResult) {
-    if (f.round > lastRound) lastRound = f.round;
-  }
-
-  const nextRound = lastRound + 1;
+  const nextRound = reportRound + 1;
   const season = "2025/26";
 
   // 3) HELPERI ZA TABLICE
 
   function renderResultsTable(leagueCode: string) {
     const fxRound = fixtures
-      .filter((f) => f.league_code === leagueCode && f.round === lastRound)
+      .filter((f) => f.league_code === leagueCode && f.round === reportRound)
       .sort((a, b) =>
         a.match_date === b.match_date
           ? (a.match_time || "").localeCompare(b.match_time || "")
@@ -153,7 +157,7 @@ export async function POST(request: Request) {
 
     const rows = fxRound
       .map((f, idx) => {
-        const r = latestResult(f.results);
+        const r = f.results?.[0] || null;
         const score =
           r && r.home_goals !== null && r.away_goals !== null
             ? `${r.home_goals}:${r.away_goals}`
@@ -164,19 +168,24 @@ export async function POST(request: Request) {
           <tr ${cls}>
             <td class="left">${esc(teamName.get(f.home_team_id) || "")}</td>
             <td class="left">${esc(teamName.get(f.away_team_id) || "")}</td>
-            <td class="center">${score}</td>
+            <td class="center score">${score}</td>
           </tr>
         `;
       })
       .join("");
 
     return `
-      <table>
+      <table class="results-table">
+        <colgroup>
+          <col />
+          <col />
+          <col />
+        </colgroup>
         <thead>
           <tr class="header">
             <th class="left">Domaćin</th>
             <th class="left">Gost</th>
-            <th class="center">Rezultat</th>
+            <th class="center score">Rezultat</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -218,7 +227,7 @@ export async function POST(request: Request) {
       .join("");
 
     return `
-      <table>
+      <table class="standings-table">
         <thead>
           <tr class="header">
             <th class="center">R.br</th>
@@ -254,7 +263,7 @@ export async function POST(request: Request) {
         const cls = idx % 2 ? `class="shaded"` : "";
         return `
         <tr ${cls}>
-          <td class="center">${hrDate(f.match_date)}</td>
+          <td class="left">${hrDate(f.match_date)}</td>
           <td class="center">${hrTime(f.match_time)}</td>
           <td class="left">${esc(teamName.get(f.home_team_id) || "")}</td>
           <td class="left">${esc(teamName.get(f.away_team_id) || "")}</td>
@@ -263,10 +272,16 @@ export async function POST(request: Request) {
       .join("");
 
     return `
-      <table>
+      <table class="schedule-table">
+        <colgroup>
+          <col />
+          <col />
+          <col />
+          <col />
+        </colgroup>
         <thead>
           <tr class="header">
-            <th class="center">Datum</th>
+            <th class="left">Datum</th>
             <th class="center">Vrijeme</th>
             <th class="left">Domaćin</th>
             <th class="left">Gost</th>
@@ -282,10 +297,10 @@ export async function POST(request: Request) {
       <section class="league-section">
         <h2>${esc(lg.label)}</h2>
 
-        <h3>Rezultati ${lastRound}. kola</h3>
+        <h3>Rezultati ${reportRound}. kola</h3>
         ${renderResultsTable(lg.db)}
 
-        <h3>Tablica nakon ${lastRound}. kola</h3>
+        <h3>Tablica nakon ${reportRound}. kola</h3>
         ${renderStandingsTable(lg.db)}
 
         <h3>Iduće kolo (${nextRound}. kolo)</h3>
@@ -294,7 +309,7 @@ export async function POST(request: Request) {
     `
   ).join("");
 
-  const title = `izvjestaj_kolo_${lastRound}`;
+  const title = `izvjestaj_kolo_${reportRound}`;
 
   const html = `
 <!DOCTYPE html>
@@ -304,61 +319,52 @@ export async function POST(request: Request) {
   <title>${title}</title>
   <meta name="file-name" content="${title}.pdf" />
   <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      margin: 40px 40px 80px 40px;
-      color:#222;
-    }
-    h1 { text-align:center; color:#0A5E2A; margin-bottom:10px; }
-    h2 { text-align:center; color:#0A5E2A; margin-top:40px; margin-bottom:10px; }
-    h3 { color:#0A5E2A; margin-top:20px; margin-bottom:8px; }
-    table {
-      width:100%;
-      max-width:720px;
-      border-collapse:collapse;
-      margin:0 auto 20px auto;
-      font-size:12px;
-    }
-    th, td { padding:4px 6px; }
-    th {
-      background:#FFF0E6;
-      color:#F37C22;
-    }
-    td {
-      border-top:1px solid #f0e2ce;
-    }
-    th.left, td.left { text-align:left; }
-    th.center, td.center { text-align:center; }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 40px; color:#222; }
+    h1 { text-align:center; color:#0A5E2A; }
+    h2 { text-align:center; color:#0A5E2A; margin-top:40px; }
+    h3 { color:#0A5E2A; margin-top:20px; }
+
+    table { width:100%; border-collapse:collapse; margin-bottom:20px; font-size:12px; }
+    th { background:#FFF0E6; color:#F37C22; padding:4px 6px; }
+    td { padding:4px 6px; }
+    .left { text-align:left; }
+    .center { text-align:center; }
+    .score { font-weight:bold; }
+
     .shaded { background:#FFF8F2; }
     .league-section { page-break-after:always; }
     .league-section:last-of-type { page-break-after:auto; }
+
+    table.results-table col:nth-child(1),
+    table.results-table col:nth-child(2) { width:40%; }
+    table.results-table col:nth-child(3) { width:20%; }
+
+    table.schedule-table col:nth-child(1) { width:25%; }
+    table.schedule-table col:nth-child(2) { width:15%; }
+    table.schedule-table col:nth-child(3) { width:30%; }
+    table.schedule-table col:nth-child(4) { width:30%; }
+
     footer {
-      position:fixed;
-      bottom:16px;
-      left:0;
-      right:0;
-      text-align:center;
+      position: fixed;
+      bottom: 16px;
+      left: 0;
+      right: 0;
+      text-align: center;
       color:#F37C22;
-      font-size:12px;
-    }
-    .subtitle {
-      text-align:center;
-      color:#F37C22;
-      margin-bottom:20px;
+      font-size: 12px;
     }
   </style>
 </head>
-<body data-round="${lastRound}">
-  <h1>Izvještaj nakon ${lastRound}. kola</h1>
-  <div class="subtitle">
+
+<body data-round="${reportRound}">
+  <h1>Izvještaj nakon ${reportRound}. kola</h1>
+  <div class="subtitle" style="text-align:center;color:#F37C22;margin-bottom:20px;">
     malonogometne lige Panadić 2025/26
   </div>
 
   ${leaguesHtml}
 
-  <footer>
-    panadic.vercel.app
-  </footer>
+  <footer>panadic.vercel.app</footer>
 </body>
 </html>
 `;
@@ -368,7 +374,7 @@ export async function POST(request: Request) {
     .from("reports")
     .insert({
       season,
-      round: lastRound,
+      round: reportRound,
       html,
     })
     .select("id, season, round, created_at")
