@@ -1,9 +1,6 @@
+// app/api/reports/generate/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 // SAMO REGULARNE LIGE – bez Zlatne i Srebrne
 const LEAGUES = [
@@ -67,8 +64,8 @@ export async function POST() {
     { data: fixturesRaw, error: fixturesError },
     { data: standingsData, error: standingsError },
   ] = await Promise.all([
-    supabase.from("teams").select("id, name"),
-    supabase
+    supabaseAdmin.from("teams").select("id, name"),
+    supabaseAdmin
       .from("fixtures")
       .select(
         `
@@ -85,10 +82,17 @@ export async function POST() {
       .order("league_code")
       .order("round")
       .order("match_date"),
-    supabase.from("standings").select("*"),
+    supabaseAdmin.from("standings").select("*"),
   ]);
 
-  if (!teamsData || !fixturesRaw || !standingsData || teamsError || fixturesError || standingsError) {
+  if (
+    !teamsData ||
+    !fixturesRaw ||
+    !standingsData ||
+    teamsError ||
+    fixturesError ||
+    standingsError
+  ) {
     console.error("Greška pri dohvaćanju podataka:", {
       teamsError,
       fixturesError,
@@ -105,7 +109,7 @@ export async function POST() {
   const teamName = new Map<number, string>();
   teamsData.forEach((t: any) => teamName.set(t.id, t.name));
 
-  // 2) ZADNJE KOLO
+  // 2) ZADNJE KOLO S POTPUNIM REZULTATIMA
   const fixturesWithResult = fixtures.filter((f) => {
     const r = f.results?.[0];
     return r && r.home_goals !== null && r.away_goals !== null;
@@ -119,7 +123,7 @@ export async function POST() {
   const nextRound = lastRound + 1;
   const season = "2025/26";
 
-  // 3) HELPERI ZA TABLICE
+  // ----- HELPERI ZA TABLICE -----
 
   function renderResultsTable(leagueCode: string) {
     const fxRound = fixtures
@@ -316,7 +320,7 @@ export async function POST() {
 `;
 
   // 4) SPREMI U TABLICU reports
-  const { data: inserted, error: insertError } = await supabase
+  const { data: inserted, error: insertError } = await supabaseAdmin
     .from("reports")
     .insert({
       season,
