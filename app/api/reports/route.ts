@@ -1,13 +1,10 @@
+// app/api/reports/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 // GET -> lista svih izvještaja (id, season, round, created_at)
 export async function GET() {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("reports")
     .select("id, season, round, created_at")
     .order("season", { ascending: false })
@@ -34,7 +31,10 @@ export async function DELETE(request: Request) {
     return new NextResponse("Neispravan id", { status: 400 });
   }
 
-  const { error } = await supabase.from("reports").delete().eq("id", id);
+  const { error } = await supabaseAdmin
+    .from("reports")
+    .delete()
+    .eq("id", id);
 
   if (error) {
     console.error("Greška pri brisanju izvještaja:", error);
