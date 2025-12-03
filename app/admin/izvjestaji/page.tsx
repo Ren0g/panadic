@@ -1,4 +1,3 @@
-// app/admin/izvjestaji/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -10,32 +9,23 @@ type Report = {
   created_at: string;
 };
 
-type GroupedReports = {
-  [season: string]: Report[];
-};
-
-const MAX_ROUNDS = 11; // broj kola u sezoni
-
-export default function AdminReportsPage() {
+export default function ReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [round, setRound] = useState<number>(1);
   const [generating, setGenerating] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedRound, setSelectedRound] = useState<string>("");
 
-  // ---- LOAD REPORTS ----
+  // --- LOAD REPORTS ---
   async function loadReports() {
     setLoading(true);
-    setError(null);
     try {
       const res = await fetch("/api/reports", { cache: "no-store" });
-      if (!res.ok) {
-        throw new Error("Greška pri dohvaćanju arhive izvještaja");
-      }
-      const data = (await res.json()) as Report[];
-      setReports(data);
+      if (!res.ok) throw new Error("Ne mogu dohvatiti arhivu.");
+      const data = await res.json();
+      setReports(data || []);
     } catch (err: any) {
-      setError(err.message || "Greška pri učitavanju podataka");
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -45,227 +35,173 @@ export default function AdminReportsPage() {
     loadReports();
   }, []);
 
-  // ---- GENERATE NEW REPORT ----
-  async function handleGenerate() {
-    if (!selectedRound) {
-      setError("Odaberi kolo za koje želiš generirati izvještaj.");
-      return;
-    }
-
+  // --- GENERATE REPORT ---
+  async function generateReport() {
     setGenerating(true);
     setError(null);
+
     try {
-      const res = await fetch("/api/reports/generate", {
+      const res = await fetch(`/api/reports/generate?round=${round}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ round: Number(selectedRound) }),
       });
 
       if (!res.ok) {
         const txt = await res.text();
-        throw new Error(txt || "Greška pri generiranju izvještaja");
+        throw new Error(txt);
       }
 
       const data = await res.json();
-
-      if (data?.id) {
-        // otvori novi tab s HTML-om koji odmah ide na print
-        window.open(`/api/reports/${data.id}?print=1`, "_blank");
-      }
+      if (data?.id) window.open(`/api/reports/${data.id}?print=1`, "_blank");
 
       await loadReports();
     } catch (err: any) {
-      setError(err.message || "Greška pri generiranju izvještaja");
+      setError(err.message || "Greška pri generiranju izvještaja.");
     } finally {
       setGenerating(false);
     }
   }
 
-  // ---- DELETE REPORT ----
-  async function handleDelete(id: number) {
-    const yes = confirm("Jeste li sigurni da želite obrisati ovaj izvještaj?");
-    if (!yes) return;
+  // --- DELETE ---
+  async function deleteReport(id: number) {
+    if (!confirm("Obriši izvještaj?")) return;
 
-    try {
-      const res = await fetch(`/api/reports?id=${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || "Greška pri brisanju izvještaja");
-      }
+    const res = await fetch(`/api/reports?id=${id}`, {
+      method: "DELETE",
+    });
+
+    if (res.ok) {
       setReports((prev) => prev.filter((r) => r.id !== id));
-    } catch (err: any) {
-      alert(err.message || "Greška pri brisanju izvještaja");
+    } else {
+      const txt = await res.text();
+      alert(txt);
     }
   }
 
-  // ---- GROUP BY SEASON ----
-  const grouped: GroupedReports = reports.reduce((acc, r) => {
-    if (!acc[r.season]) acc[r.season] = [];
-    acc[r.season].push(r);
-    return acc;
-  }, {} as GroupedReports);
-
-  const seasons = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
-
-  function formatDateTime(iso: string) {
+  // --- HELPER ---
+  function formatDate(iso: string) {
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yyyy = d.getFullYear();
-    const hh = String(d.getHours()).padStart(2, "0");
-    const min = String(d.getMinutes()).padStart(2, "0");
-    return `${dd}.${mm}.${yyyy}. u ${hh}:${min}`;
-  }
-
-  function buildFileName(r: Report) {
-    const d = new Date(r.created_at);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    const hh = String(d.getHours()).padStart(2, "0");
-    const min = String(d.getMinutes()).padStart(2, "0");
-    return `izvjestaj_kolo_${r.round}_${yyyy}-${mm}-${dd}_${hh}-${min}.html`;
+    return d.toLocaleString("hr-HR");
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-8">
+    <div className="max-w-5xl mx-auto px-6 py-10">
+
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-[#0A5E2A]">
-            Arhiva izvještaja — sezona 2025/26
-          </h1>
-          <p className="text-sm text-gray-600">
-            Pregled svih automatski generiranih izvještaja po kolima.
-          </p>
-        </div>
+      <h1 className="text-3xl font-bold text-[#0A5E2A] mb-1">
+        Arhiva izvještaja — sezona 2025/26
+      </h1>
+      <p className="text-gray-600 mb-8">
+        Pregled svih automatski generiranih izvještaja po kolima.
+      </p>
 
-        <div className="flex flex-col items-stretch sm:flex-row sm:items-center gap-2">
-          <button
-            onClick={() => (window.location.href = "/admin")}
-            className="px-4 py-2 rounded-full cursor-pointer bg-[#f7f1e6] border border-[#c8b59a] text-[#0A5E2A] shadow text-sm"
-          >
-            ← Natrag na Admin panel
-          </button>
+      {/* TOOLS BAR */}
+      <div className="flex flex-wrap items-center gap-4 mb-8">
 
-          <div className="flex items-center gap-2">
-            <select
-              value={selectedRound}
-              onChange={(e) => setSelectedRound(e.target.value)}
-              className="px-3 py-2 rounded-full border border-[#c8b59a] bg-white text-sm"
-            >
-              <option value="">Kolo...</option>
-              {Array.from({ length: MAX_ROUNDS }, (_, i) => i + 1).map(
-                (r) => (
-                  <option key={r} value={r}>
-                    {r}. kolo
-                  </option>
-                )
-              )}
-            </select>
+        {/* BACK */}
+        <button
+          onClick={() => (window.location.href = "/admin")}
+          className="px-4 py-2 rounded-full bg-[#f7f1e6] border border-[#c8b59a] 
+                     text-[#0A5E2A] shadow hover:bg-[#eadfc9]"
+        >
+          ← Natrag na Admin panel
+        </button>
 
-            <button
-              onClick={handleGenerate}
-              disabled={generating}
-              className="px-4 py-2 text-white rounded-full cursor-pointer bg-[#0A5E2A] hover:bg-[#08471f] shadow text-sm disabled:opacity-60"
-            >
-              {generating ? "Generiram..." : "📄 Generiraj izvještaj"}
-            </button>
-          </div>
-        </div>
+        {/* SELECT ROUND */}
+        <select
+          value={round}
+          onChange={(e) => setRound(Number(e.target.value))}
+          className="px-3 py-2 rounded-full border border-[#c8b59a] bg-white shadow"
+        >
+          {Array.from({ length: 20 }).map((_, i) => (
+            <option key={i} value={i + 1}>
+              {i + 1}. kolo
+            </option>
+          ))}
+        </select>
+
+        {/* GENERATE BUTTON */}
+        <button
+          onClick={generateReport}
+          disabled={generating}
+          className="px-6 py-3 rounded-full bg-[#0A5E2A] text-white shadow 
+                     hover:bg-[#08471f] disabled:opacity-60"
+        >
+          {generating ? "Generiram…" : "📄 Generiraj izvještaj"}
+        </button>
       </div>
 
       {error && (
-        <div className="p-3 rounded bg-red-100 text-red-700 text-sm">
+        <div className="bg-red-100 border border-red-300 text-red-700 p-3 rounded mb-4">
           {error}
         </div>
       )}
 
-      {loading && <div>Učitavanje arhive...</div>}
+      {loading && <div>Učitavanje…</div>}
 
-      {!loading && seasons.length === 0 && (
-        <div className="text-sm text-gray-600">
-          Još nema nijednog spremljenog izvještaja u arhivi.
+      {!loading && reports.length === 0 && (
+        <div className="text-gray-600">Još nema spremljenih izvještaja.</div>
+      )}
+
+      {/* REPORT LIST */}
+      {reports.length > 0 && (
+        <div className="bg-[#f7f1e6] border border-[#c8b59a] rounded-xl p-5 space-y-4">
+          <h2 className="text-xl font-semibold text-[#0A5E2A] mb-2">
+            Sezona 2025/26
+          </h2>
+
+          {reports.map((r) => (
+            <div
+              key={r.id}
+              className="flex flex-wrap items-center justify-between bg-white 
+                         px-4 py-3 rounded-lg border border-[#e2d5bd] shadow"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-[#0A5E2A]" />
+                <div>
+                  <div className="text-[#0A5E2A] font-medium text-sm">
+                    {r.round}. kolo
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    Generirano: {formatDate(r.created_at)}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 text-xs mt-2 sm:mt-0">
+                <button
+                  onClick={() =>
+                    window.open(`/api/reports/${r.id}?print=1`, "_blank")
+                  }
+                  className="px-3 py-1 rounded-full border border-[#c8b59a] 
+                             bg-[#f7f1e6] text-[#0A5E2A]"
+                >
+                  Otvori / PDF
+                </button>
+
+                <a
+                  href={`/api/reports/${r.id}?print=0`}
+                  target="_blank"
+                  className="px-3 py-1 rounded-full border border-[#c8b59a] 
+                             bg-white text-[#0A5E2A]"
+                >
+                  Preuzmi HTML
+                </a>
+
+                <button
+                  onClick={() => deleteReport(r.id)}
+                  className="px-3 py-1 rounded-full bg-red-600 text-white 
+                             hover:bg-red-700"
+                >
+                  Obriši
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {!loading &&
-        seasons.map((season) => {
-          const reps = grouped[season].slice().sort((a, b) => {
-            return (
-              new Date(b.created_at).getTime() -
-              new Date(a.created_at).getTime()
-            );
-          });
-
-          return (
-            <div
-              key={season}
-              className="bg-[#f7f1e6] border border-[#c8b59a] rounded-xl p-5 space-y-4"
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-[#0A5E2A]">
-                  Sezona {season}
-                </h2>
-              </div>
-
-              <div className="space-y-4">
-                {reps.map((r) => (
-                  <div
-                    key={r.id}
-                    className="flex flex-col md:flex-row md:items-center md:justify-between bg-white rounded-lg border border-[#e2d5bd] shadow px-4 py-3 gap-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-[#0A5E2A]" />
-                      <div>
-                        <div className="font-medium text-sm text-[#0A5E2A]">
-                          {r.round}. kolo
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          Generirano: {formatDateTime(r.created_at)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-xs">
-                      <button
-                        onClick={() =>
-                          window.open(
-                            `/api/reports/${r.id}?print=1`,
-                            "_blank"
-                          )
-                        }
-                        className="px-3 py-1 rounded-full border border-[#c8b59a] bg-[#f7f1e6] text-[#0A5E2A] cursor-pointer"
-                      >
-                        Otvori / PDF
-                      </button>
-
-                      <a
-                        href={`/api/reports/${r.id}?print=0`}
-                        target="_blank"
-                        rel="noreferrer"
-                        download={buildFileName(r)}
-                        className="px-3 py-1 rounded-full border border-[#c8b59a] bg-white text-[#0A5E2A] cursor-pointer"
-                      >
-                        Preuzmi HTML
-                      </a>
-
-                      <button
-                        onClick={() => handleDelete(r.id)}
-                        className="px-3 py-1 rounded-full bg-red-600 hover:bg-red-700 text-white cursor-pointer"
-                      >
-                        Obriši
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
+      {/* FOOTER SPACING */}
+      <div className="h-16" />
     </div>
   );
 }
