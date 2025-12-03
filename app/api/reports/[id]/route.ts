@@ -1,6 +1,10 @@
 // app/api/reports/[id]/route.ts
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 type Params = {
   params: {
@@ -17,7 +21,7 @@ export async function GET(request: Request, { params }: Params) {
     return new NextResponse("Neispravan id", { status: 400 });
   }
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("reports")
     .select("html, round")
     .eq("id", id)
