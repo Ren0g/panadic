@@ -61,7 +61,8 @@ export async function POST(request: Request) {
         )
         .eq("round", round)
         .order("league_code")
-        .order("match_date"),
+        .order("match_date")
+        .order("match_time"),
       supabase.from("standings").select("*"),
     ]);
 
@@ -75,14 +76,15 @@ export async function POST(request: Request) {
     const standings = standingsData as any[];
 
     const teamName = new Map<number, string>();
-    teamsData.forEach((t: any) => teamName.set(t.id, t.name));
+    (teamsData as any[]).forEach((t: any) => teamName.set(t.id, t.name));
 
     // Helper – HTML escape
     const esc = (s: string) =>
       s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
     // --- RENDER FUNKCIJE ---
-    function renderResultsTable(league: string) {
+
+    const renderResultsTable = (league: string): string => {
       const fx = fixtures.filter((f) => f.league_code === league);
 
       if (fx.length === 0) {
@@ -118,9 +120,9 @@ export async function POST(request: Request) {
           <tbody>${rows}</tbody>
         </table>
       `;
-    }
+    };
 
-    function renderStandingsTable(league: string) {
+    const renderStandingsTable = (league: string): string => {
       const st = standings.filter((s) => s.league_code === league);
 
       if (st.length === 0) return `<p>Nema tablice.</p>`;
@@ -172,22 +174,21 @@ export async function POST(request: Request) {
           <tbody>${rows}</tbody>
         </table>
       `;
-    }
+    };
 
     // --- NEXT ROUND (round+1) ---
-    const [
-      { data: nextFixturesRaw }
-    ] = await Promise.all([
+    const [{ data: nextFixturesRaw }] = await Promise.all([
       supabase
         .from("fixtures")
         .select("*")
         .eq("round", round + 1)
         .order("match_date")
+        .order("match_time"),
     ]);
 
-    const nextFixtures = nextFixturesRaw || [];
+    const nextFixtures = (nextFixturesRaw as any[]) || [];
 
-    function renderNextRoundTable(league: string) {
+    const renderNextRoundTable = (league: string): string => {
       const fx = nextFixtures.filter((f: any) => f.league_code === league);
 
       if (fx.length === 0) return `<p>Nema rasporeda.</p>`;
@@ -217,7 +218,7 @@ export async function POST(request: Request) {
           <tbody>${rows}</tbody>
         </table>
       `;
-    }
+    };
 
     // --- HTML ---
     const leaguesHtml = LEAGUES.map(
@@ -247,7 +248,7 @@ export async function POST(request: Request) {
   <title>${title}</title>
   <meta name="file-name" content="${title}.pdf" />
   <style>
-    body { font-family: system-ui; margin: 40px; color:#222; }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 40px; color:#222; }
     h1 { text-align:center; color:#0A5E2A; }
     h2 { text-align:center; color:#0A5E2A; margin-top:40px; }
     h3 { color:#0A5E2A; margin-top:20px; margin-bottom:8px; }
@@ -258,6 +259,7 @@ export async function POST(request: Request) {
     td.center { text-align:center; }
     .shaded { background:#FFF8F2; }
     .league-section { page-break-after:always; }
+    .league-section:last-of-type { page-break-after:auto; }
     footer { text-align:center; margin-top:40px; color:#F37C22; font-size:12px; }
   </style>
 </head>
