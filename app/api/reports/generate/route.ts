@@ -19,7 +19,9 @@ type FixtureRow = {
   match_time: string | null;
   home_team_id: number;
   away_team_id: number;
-  results: { home_goals: number | null; away_goals: number | null }[] | null;
+  results:
+    | { home_goals: number | null; away_goals: number | null }[]
+    | null;
 };
 
 type StandingRow = {
@@ -57,7 +59,24 @@ function esc(str: string) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export async function POST() {
+export async function POST(req: Request) {
+  // 0) PROČITAJ Kolo iz bodyja
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return new NextResponse("Neispravan JSON body.", { status: 400 });
+  }
+
+  const round = Number(body?.round);
+  if (!Number.isFinite(round) || round < 1 || round > 11) {
+    return new NextResponse("Neispravan broj kola.", { status: 400 });
+  }
+
+  const targetRound = round;
+  const nextRound = targetRound + 1;
+  const season = "2025/26";
+
   // 1) PODACI
   const [
     { data: teamsData, error: teamsError },
@@ -109,25 +128,19 @@ export async function POST() {
   const teamName = new Map<number, string>();
   teamsData.forEach((t: any) => teamName.set(t.id, t.name));
 
-  // 2) ZADNJE KOLO S POTPUNIM REZULTATIMA
-  const fixturesWithResult = fixtures.filter((f) => {
-    const r = f.results?.[0];
-    return r && r.home_goals !== null && r.away_goals !== null;
-  });
-
-  let lastRound = 1;
-  for (const f of fixturesWithResult) {
-    if (f.round > lastRound) lastRound = f.round;
+  // Opcionalno: provjera da uopće ima utakmica u tom kolu
+  const anyForRound = fixtures.some((f) => f.round === targetRound);
+  if (!anyForRound) {
+    return new NextResponse("Nema susreta za zadano kolo.", { status: 400 });
   }
-
-  const nextRound = lastRound + 1;
-  const season = "2025/26";
 
   // ----- HELPERI ZA TABLICE -----
 
   function renderResultsTable(leagueCode: string) {
     const fxRound = fixtures
-      .filter((f) => f.league_code === leagueCode && f.round === lastRound)
+      .filter(
+        (f) => f.league_code === leagueCode && f.round === targetRound
+      )
       .sort((a, b) =>
         a.match_date === b.match_date
           ? (a.match_time || "").localeCompare(b.match_time || "")
@@ -138,7 +151,12 @@ export async function POST() {
 
     const rows = fxRound
       .map((f, idx) => {
-        const r = f.results?.[0];
+        const resField: any = f.results;
+        const r =
+          Array.isArray(resField) && resField.length > 0
+            ? resField[0]
+            : null;
+
         const score =
           r && r.home_goals !== null && r.away_goals !== null
             ? `${r.home_goals}:${r.away_goals}`
@@ -225,7 +243,9 @@ export async function POST() {
 
   function renderNextRoundTable(leagueCode: string) {
     const fx = fixtures
-      .filter((f) => f.league_code === leagueCode && f.round === nextRound)
+      .filter(
+        (f) => f.league_code === leagueCode && f.round === nextRound
+      )
       .sort((a, b) =>
         a.match_date === b.match_date
           ? (a.match_time || "").localeCompare(b.match_time || "")
@@ -267,10 +287,10 @@ export async function POST() {
       <section class="league-section">
         <h2>${esc(lg.label)}</h2>
 
-        <h3>Rezultati ${lastRound}. kola</h3>
+        <h3>Rezultati ${targetRound}. kola</h3>
         ${renderResultsTable(lg.db)}
 
-        <h3>Tablica nakon ${lastRound}. kola</h3>
+        <h3>Tablica nakon ${targetRound}. kola</h3>
         ${renderStandingsTable(lg.db)}
 
         <h3>Iduće kolo (${nextRound}. kolo)</h3>
@@ -279,7 +299,7 @@ export async function POST() {
     `
   ).join("");
 
-  const title = `izvjestaj_kolo_${lastRound}`;
+  const title = `izvjestaj_kolo_${targetRound}`;
 
   const html = `
 <!DOCTYPE html>
@@ -304,8 +324,8 @@ export async function POST() {
   </style>
 </head>
 
-<body data-round="${lastRound}">
-  <h1>Izvještaj nakon ${lastRound}. kola</h1>
+<body data-round="${targetRound}">
+  <h1>Izvještaj nakon ${targetRound}. kola</h1>
   <div class="subtitle" style="text-align:center;color:#F37C22;margin-bottom:20px;">
     malonogometne lige Panadić 2025/26
   </div>
@@ -324,7 +344,7 @@ export async function POST() {
     .from("reports")
     .insert({
       season,
-      round: lastRound,
+      round: targetRound,
       html,
     })
     .select("id, season, round, created_at")
