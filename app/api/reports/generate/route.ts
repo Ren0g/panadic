@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       .from("standings")
       .select("*");
 
-    // --- NEXT ROUND ---
+    // --- NEXT ROUND FIXTURES ---
     const { data: nextFixtures } = await supabase
       .from("fixtures")
       .select("*")
@@ -75,6 +75,7 @@ export async function POST(request: Request) {
     const esc = (s: string) =>
       s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+    // --- RENDER: RESULTS ---
     const renderResults = (lg: string) => {
       const fx = (fixtures || []).filter((f) => f.league_code === lg);
 
@@ -111,6 +112,7 @@ export async function POST(request: Request) {
       </table>`;
     };
 
+    // --- RENDER: STANDINGS ---
     const renderStandings = (lg: string) => {
       const st = (standings || []).filter((s) => s.league_code === lg);
 
@@ -164,6 +166,7 @@ export async function POST(request: Request) {
       </table>`;
     };
 
+    // --- RENDER: NEXT ROUND ---
     const renderNext = (lg: string) => {
       const fx = (nextFixtures || []).filter((f) => f.league_code === lg);
 
@@ -195,7 +198,7 @@ export async function POST(request: Request) {
       </table>`;
     };
 
-    // --- HTML ---
+    // --- PAGE HTML ---
     const title = `izvjestaj_kolo_${round}`;
 
     const leaguesHtml = LEAGUES.map(
@@ -223,11 +226,9 @@ export async function POST(request: Request) {
   h1 { text-align:center; color:#0A5E2A; }
   h2 { text-align:center; color:#0A5E2A; margin-top:40px; }
   h3 { color:#0A5E2A; margin-top:25px; margin-bottom:8px; }
-  table { width:100%; border-collapse:collapse; margin-bottom:20px; font-size:12px; }
-  th, td { padding:4px 6px; border-bottom:1px solid #eee; }
-  th { background:#FFF0E6; color:#F37C22; }
-  td.left { text-align:left; }
-  td.center { text-align:center; }
+  table { width:100%; border-collapse:collapse; margin-bottom:20px; font-size:12px; table-layout: fixed; }
+  th, td { padding:4px 6px; border-bottom:1px solid #eee; text-align:center; }
+  td.left { text-align:left !important; }
   .shaded { background:#FFF8F2; }
   .league-section { page-break-after:always; }
   .league-section:last-of-type { page-break-after:auto; }
