@@ -20,9 +20,16 @@ const hrDate = (str: string | null) =>
 
 const hrTime = (t: string | null) => (t ? t.slice(0, 5) : "");
 
-// ⬅⬅⬅ *** OVDJE STAVLJAMO getResult IZVAN POST BLOKA ***
+// --- FIX: Stabilan getResult ---
 const getResult = (f: any) => {
   if (!f.results) return null;
+
+  // If Supabase returns a single object instead of array
+  if (!Array.isArray(f.results)) {
+    return f.results.fixture_id === f.id ? f.results : null;
+  }
+
+  // Normal case: array
   return f.results.find((r: any) => r.fixture_id === f.id) || null;
 };
 
@@ -79,7 +86,9 @@ export async function POST(request: Request) {
       .order("match_time");
 
     const esc = (s: string) =>
-      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      s.replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 
     // --- RENDER: RESULTS ---
     const renderResults = (lg: string) => {
@@ -271,7 +280,7 @@ export async function POST(request: Request) {
       .select("id, season, round, created_at")
       .single();
 
-    if (error) return new NextResponse("Greška pri spremanju.", { status: 500 });
+    if (error) return new NextResponse("Greška pri spremanju HTML-a.", { status: 500 });
 
     return NextResponse.json(inserted);
   } catch (e) {
