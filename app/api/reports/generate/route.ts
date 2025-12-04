@@ -39,8 +39,7 @@ export async function POST(request: Request) {
     // --- FIXTURES (LEFT JOIN RESULTS) ---
     const { data: fixtures } = await supabase
       .from("fixtures")
-      .select(
-        `
+      .select(`
         id,
         league_code,
         round,
@@ -49,15 +48,22 @@ export async function POST(request: Request) {
         home_team_id,
         away_team_id,
         results:results!left (
+          id,
+          fixture_id,
           home_goals,
           away_goals
         )
-      `
-      )
+      `)
       .eq("round", round)
       .order("league_code")
       .order("match_date")
       .order("match_time");
+
+    // helper → uzmi točan rezultat po fixture_id
+    function getResult(f: any) {
+      if (!f.results) return null;
+      return f.results.find((r: any) => r.fixture_id === f.id) || null;
+    }
 
     // --- STANDINGS ---
     const { data: standings } = await supabase
@@ -84,7 +90,8 @@ export async function POST(request: Request) {
 
       const rows = fx
         .map((f, i) => {
-          const r = f.results?.[0];
+          const r = getResult(f);
+
           const score =
             r && r.home_goals != null && r.away_goals != null
               ? `${r.home_goals}:${r.away_goals}`
@@ -228,7 +235,7 @@ export async function POST(request: Request) {
   h3 { color:#0A5E2A; margin-top:25px; margin-bottom:8px; }
   table { width:100%; border-collapse:collapse; margin-bottom:20px; font-size:12px; table-layout: fixed; }
   th, td { padding:4px 6px; border-bottom:1px solid #eee; text-align:center; }
-  td.left { text-align:left !important; }
+  td.left { text-align:center !important; }
   .shaded { background:#FFF8F2; }
   .league-section { page-break-after:always; }
   .league-section:last-of-type { page-break-after:auto; }
