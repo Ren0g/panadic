@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { recalculateStandingsForFixture } from "@/lib/recalculateStandings";
 
 type LeagueCode =
   | "PIONIRI"
@@ -65,8 +64,8 @@ export default function AdminPage() {
       match_time: f.match_time,
       home_team: f.home?.name ?? "",
       away_team: f.away?.name ?? "",
-      home_goals: f.result?.home_goals ?? "",
-      away_goals: f.result?.away_goals ?? "",
+      home_goals: f.result?.home_goals ?? null,
+      away_goals: f.result?.away_goals ?? null,
       datetime: f.match_date ? new Date(`${f.match_date}T${f.match_time}`) : null,
     }));
 
@@ -78,33 +77,6 @@ export default function AdminPage() {
 
     setNextRound(nr);
     setLoading(false);
-  }
-
-  async function saveResult(id: number, home: any, away: any) {
-    const hg = home === "" ? null : Number(home);
-    const ag = away === "" ? null : Number(away);
-
-    const { data: existing } = await supabase
-      .from("results")
-      .select("*")
-      .eq("fixture_id", id)
-      .maybeSingle();
-
-    if (existing) {
-      await supabase.from("results").update({ home_goals: hg, away_goals: ag }).eq("fixture_id", id);
-    } else {
-      await supabase.from("results").insert({ fixture_id: id, home_goals: hg, away_goals: ag });
-    }
-
-    await recalculateStandingsForFixture(id);
-    if (league) loadFixtures(league);
-  }
-
-  async function deleteResult(id: number) {
-    if (!confirm("Jeste li sigurni?")) return;
-    await supabase.from("results").delete().eq("fixture_id", id);
-    await recalculateStandingsForFixture(id);
-    if (league) loadFixtures(league);
   }
 
   // LOGIN SCREEN
@@ -133,8 +105,8 @@ export default function AdminPage() {
   // ADMIN PANEL
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-10">
-
-      {/* ---------- HEADER (Back + Title + Izvještaji) ---------- */}
+      
+      {/* HEADER */}
       <div className="flex items-center justify-between">
         <button
           onClick={() => (window.location.href = "/")}
@@ -144,7 +116,7 @@ export default function AdminPage() {
         </button>
 
         <h1 className="text-xl sm:text-2xl font-bold text-[#0A5E2A] text-center flex-1">
-          Admin panel — Unos rezultata
+          Admin panel — Pregled rezultata
         </h1>
 
         <button
@@ -155,10 +127,8 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {/* ---------- Gumbi ispod naslova ---------- */}
+      {/* GUMBI */}
       <div className="flex justify-center flex-wrap gap-4">
-
-        {/* POVEĆANI LIVE GUMB (delegatski) */}
         <button
           onClick={() => (window.location.href = "/admin/live")}
           className="px-10 py-4 rounded-full bg-red-600 hover:bg-red-700 text-white shadow font-bold text-lg"
@@ -166,7 +136,6 @@ export default function AdminPage() {
           LIVE unos rezultata
         </button>
 
-        {/* MODIFIKACIJA — NARANČASTA PROMAR */}
         <button
           onClick={() => (window.location.href = "/admin/fixtures")}
           className="px-6 py-3 rounded-full bg-[#f37c22] hover:bg-[#d96d1c] text-white shadow font-semibold"
@@ -175,7 +144,7 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {/* ---------- SELECT LIGE ---------- */}
+      {/* ODABIR LIGE */}
       <div className="bg-[#f7f1e6] p-4 rounded-xl border text-center">
         <label className="font-semibold text-[#0A5E2A]">Odaberi ligu:</label>
         <select
@@ -198,7 +167,7 @@ export default function AdminPage() {
         </select>
       </div>
 
-      {/* ---------- SWITCH CURRENT / ALL ---------- */}
+      {/* SWITCH */}
       {league && (
         <div className="flex justify-center gap-4">
           <button
@@ -223,7 +192,7 @@ export default function AdminPage() {
 
       {loading && <div className="text-center">Učitavanje…</div>}
 
-      {/* ---------- CURRENT ROUND ---------- */}
+      {/* ---------- CURRENT ROUND (READ-ONLY) ---------- */}
       {league && !loading && view === "CURRENT" && nextRound && (
         <div className="bg-[#f7f1e6] p-4 rounded-xl border">
           <h2 className="text-xl font-bold text-[#0A5E2A] mb-4 text-center">{nextRound}. kolo</h2>
@@ -233,58 +202,31 @@ export default function AdminPage() {
               <div>
                 <div className="font-semibold">{f.home_team} vs {f.away_team}</div>
                 <div className="text-xs text-gray-500">
-                  {new Date(f.match_date).toLocaleDateString("hr-HR")} • {f.match_time?.slice(0,5)}
+                  {new Date(f.match_date).toLocaleDateString("hr-HR")} • {f.match_time?.slice(0, 5)}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  className="w-12 border rounded-lg text-center"
-                  value={f.home_goals}
-                  onChange={(e) =>
-                    setFixtures(prev =>
-                      prev.map(x => x.id === f.id ? { ...x, home_goals: e.target.value } : x)
-                    )
-                  }
-                />
-
-                <span className="font-bold">:</span>
-
-                <input
-                  type="number"
-                  className="w-12 border rounded-lg text-center"
-                  value={f.away_goals}
-                  onChange={(e) =>
-                    setFixtures(prev =>
-                      prev.map(x => x.id === f.id ? { ...x, away_goals: e.target.value } : x)
-                    )
-                  }
-                />
-
-                <button
-                  onClick={() => saveResult(f.id, f.home_goals, f.away_goals)}
-                  className="px-3 py-1 bg-green-700 text-white rounded-lg text-xs"
-                >
-                  Spremi
-                </button>
+              <div className="font-bold text-lg text-[#0A5E2A] min-w-[50px] text-center">
+                {f.home_goals !== null ? `${f.home_goals}:${f.away_goals}` : "—"}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* ---------- ALL ROUNDS ---------- */}
+      {/* ---------- ALL ROUNDS (READ-ONLY) ---------- */}
       {league && !loading && view === "ALL" && (
         <div className="space-y-6">
-          {Object.keys(fixtures.reduce((acc:any,f)=>{
-            if(!acc[f.round]) acc[f.round]=[];
-            acc[f.round].push(f);
-            return acc;
-          },{}))
-            .sort((a,b)=>Number(a)-Number(b))
+          {Object.keys(
+            fixtures.reduce((acc: any, f) => {
+              if (!acc[f.round]) acc[f.round] = [];
+              acc[f.round].push(f);
+              return acc;
+            }, {})
+          )
+            .sort((a, b) => Number(a) - Number(b))
             .map(round => {
-              const list = fixtures.filter(f=>f.round===Number(round));
+              const list = fixtures.filter(f => f.round === Number(round));
               return (
                 <div key={round} className="rounded-xl border bg-[#f7f1e6] p-4">
                   <h2 className="text-xl font-bold text-[#0b5b2a] mb-3">{round}. kolo</h2>
@@ -295,49 +237,12 @@ export default function AdminPage() {
                         <div>
                           <div className="font-semibold">{f.home_team} vs {f.away_team}</div>
                           <div className="text-xs text-gray-500">
-                            {new Date(f.match_date).toLocaleDateString("hr-HR")} • {f.match_time?.slice(0,5)}
+                            {new Date(f.match_date).toLocaleDateString("hr-HR")} • {f.match_time?.slice(0, 5)}
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            className="w-12 border rounded-lg text-center"
-                            value={f.home_goals}
-                            onChange={(e)=>
-                              setFixtures(prev =>
-                                prev.map(x => x.id===f.id ? { ...x, home_goals: e.target.value } : x)
-                              )
-                            }
-                          />
-
-                          <span className="font-bold">:</span>
-
-                          <input
-                            type="number"
-                            className="w-12 border rounded-lg text-center"
-                            value={f.away_goals}
-                            onChange={(e)=>
-                              setFixtures(prev =>
-                                prev.map(x => x.id===f.id ? { ...x, away_goals: e.target.value } : x)
-                              )
-                            }
-                          />
-
-                          <button
-                            onClick={() => saveResult(f.id, f.home_goals, f.away_goals)}
-                            className="px-3 py-1 bg-green-700 text-white rounded-lg text-xs"
-                          >
-                            Spremi
-                          </button>
-
-                          <button
-                            onClick={() => deleteResult(f.id)}
-                            className="px-3 py-1 bg-red-600 text-white rounded-lg text-xs"
-                          >
-                            Obriši
-                          </button>
-
+                        <div className="font-bold text-lg text-[#0A5E2A] min-w-[50px] text-center">
+                          {f.home_goals !== null ? `${f.home_goals}:${f.away_goals}` : "—"}
                         </div>
                       </div>
                     ))}
