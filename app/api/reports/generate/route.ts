@@ -20,6 +20,12 @@ const hrDate = (str: string | null) =>
 
 const hrTime = (t: string | null) => (t ? t.slice(0, 5) : "");
 
+// ⬅⬅⬅ *** OVDJE STAVLJAMO getResult IZVAN POST BLOKA ***
+const getResult = (f: any) => {
+  if (!f.results) return null;
+  return f.results.find((r: any) => r.fixture_id === f.id) || null;
+};
+
 export async function POST(request: Request) {
   try {
     const url = new URL(request.url);
@@ -58,12 +64,6 @@ export async function POST(request: Request) {
       .order("league_code")
       .order("match_date")
       .order("match_time");
-
-    // helper → uzmi točan rezultat po fixture_id
-    function getResult(f: any) {
-      if (!f.results) return null;
-      return f.results.find((r: any) => r.fixture_id === f.id) || null;
-    }
 
     // --- STANDINGS ---
     const { data: standings } = await supabase
