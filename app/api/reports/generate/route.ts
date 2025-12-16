@@ -20,7 +20,7 @@ const hrDate = (str: string | null) =>
 
 const hrTime = (t: string | null) => (t ? t.slice(0, 5) : "");
 
-// --- Stabilan getResult ---
+// stabilan rezultat (array / object)
 const getResult = (f: any) => {
   if (!f.results) return null;
   if (!Array.isArray(f.results)) {
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     const teamName = new Map<number, string>();
     (teams || []).forEach((t) => teamName.set(t.id, t.name));
 
-    // FIXTURES
+    // FIXTURES + RESULTS
     const { data: fixtures } = await supabase
       .from("fixtures")
       .select(`
@@ -181,8 +181,9 @@ export async function POST(request: Request) {
     };
 
     const leaguesHtml = LEAGUES.map(
-      (lg) => `
-      <section class="league-section">
+      (lg, idx) => `
+      ${idx > 0 ? `<div style="page-break-before:always"></div>` : ""}
+      <div class="league">
         <h2>${lg.label}</h2>
         <h3>Rezultati ${round}. kola</h3>
         ${renderResults(lg.db)}
@@ -190,8 +191,8 @@ export async function POST(request: Request) {
         ${renderStandings(lg.db)}
         <h3>Iduće kolo (${round + 1}. kolo)</h3>
         ${renderNext(lg.db)}
-        <footer>panadic.vercel.app</footer>
-      </section>`
+        <div class="footer">panadic.vercel.app</div>
+      </div>`
     ).join("");
 
     const html = `
@@ -203,19 +204,38 @@ export async function POST(request: Request) {
 <style>
   body { font-family: system-ui; margin:16px; color:#222; }
   h1 { text-align:center; margin:0 0 8px; font-size:22px; color:#0A5E2A; }
-  h2 { text-align:center; margin:16px 0 6px; font-size:18px; color:#0A5E2A; }
-  h3 { margin:10px 0 4px; font-size:14px; color:#0A5E2A; }
-  table { width:100%; border-collapse:collapse; font-size:11px; margin-bottom:12px; }
-  th, td { padding:3px 4px; border-bottom:1px solid #eee; text-align:center; }
+  h2 { text-align:center; margin:10px 0 6px; font-size:18px; color:#0A5E2A; }
+  h3 { margin:6px 0 4px; font-size:14px; color:#0A5E2A; }
+
+  table {
+    width:100%;
+    border-collapse:collapse;
+    font-size:11px;
+    margin-top:2px;
+    margin-bottom:8px;
+  }
+
+  th, td {
+    padding:3px 4px;
+    border-bottom:1px solid #eee;
+    text-align:center;
+  }
+
+  h3 + table { margin-top:2px; }
+
   .shaded { background:#FFF8F2; }
-  .league-section { page-break-before:always; }
-  .league-section:first-of-type { page-break-before:auto; }
-  footer { margin-top:12px; text-align:center; font-size:11px; color:#F37C22; }
+
+  .footer {
+    text-align:center;
+    font-size:11px;
+    color:#F37C22;
+    margin-top:6px;
+  }
 </style>
 </head>
 <body>
   <h1>Izvještaj nakon ${round}. kola</h1>
-  <div style="text-align:center;color:#F37C22;margin-bottom:10px;">
+  <div style="text-align:center;color:#F37C22;margin-bottom:8px;">
     malonogometne lige Panadić 2025/26
   </div>
   ${leaguesHtml}
