@@ -36,7 +36,6 @@ export async function GET(
     return new NextResponse("Neispravan ID.", { status: 400 });
   }
 
-  // Dohvati report (round)
   const { data: report } = await supabase
     .from("reports")
     .select("round")
@@ -49,31 +48,23 @@ export async function GET(
 
   const round = report.round;
 
-  // Teams
   const { data: teams } = await supabase.from("teams").select("id, name");
   const teamName = new Map<number, string>();
   (teams || []).forEach((t) => teamName.set(t.id, t.name));
 
-  // Fixtures + results
   const { data: fixtures } = await supabase
     .from("fixtures")
-    .select(
-      `
+    .select(`
       id,
       league_code,
       home_team_id,
       away_team_id,
       results:results!left ( home_goals, away_goals )
-    `
-    )
+    `)
     .eq("round", round);
 
-  // Standings
-  const { data: standings } = await supabase
-    .from("standings")
-    .select("*");
+  const { data: standings } = await supabase.from("standings").select("*");
 
-  // Helper: table
   const simpleTable = (rows: string[][]) =>
     new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
@@ -85,8 +76,8 @@ export async function GET(
                 new TableCell({
                   children: [
                     new Paragraph({
-                      text: c,
                       alignment: AlignmentType.CENTER,
+                      children: [new TextRun(c)],
                     }),
                   ],
                 })
@@ -133,13 +124,12 @@ export async function GET(
     ]);
 
     return {
-      properties: {},
       footers: {
         default: new Footer({
           children: [
             new Paragraph({
-              text: "panadic.vercel.app",
               alignment: AlignmentType.CENTER,
+              children: [new TextRun("panadic.vercel.app")],
             }),
           ],
         }),
@@ -148,6 +138,7 @@ export async function GET(
         ...(idx > 0 ? [new Paragraph({ children: [new PageBreak()] })] : []),
 
         new Paragraph({
+          alignment: AlignmentType.CENTER,
           children: [
             new TextRun({
               text: `${lg.label} — ${round}. kolo`,
@@ -155,30 +146,18 @@ export async function GET(
               size: 32,
             }),
           ],
-          alignment: AlignmentType.CENTER,
         }),
 
-        new Paragraph(""),
-        new Paragraph({
-          text: "Rezultati",
-          bold: true,
-        }),
+        new Paragraph({ children: [new TextRun("Rezultati", { bold: true })] }),
         resultsTable,
 
-        new Paragraph(""),
-        new Paragraph({
-          text: "Tablica",
-          bold: true,
-        }),
+        new Paragraph({ children: [new TextRun("Tablica", { bold: true })] }),
         standingsTable,
       ],
     };
   });
 
-  const doc = new Document({
-    sections,
-  });
-
+  const doc = new Document({ sections });
   const buffer = await Packer.toBuffer(doc);
 
   return new NextResponse(buffer, {
