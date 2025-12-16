@@ -32,9 +32,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const reportId = Number(params.id);
-  if (!reportId) {
-    return new NextResponse("Neispravan ID.", { status: 400 });
-  }
+  if (!reportId) return new NextResponse("Neispravan ID", { status: 400 });
 
   const { data: report } = await supabase
     .from("reports")
@@ -42,86 +40,86 @@ export async function GET(
     .eq("id", reportId)
     .single();
 
-  if (!report) {
-    return new NextResponse("Izvještaj ne postoji.", { status: 404 });
-  }
+  if (!report) return new NextResponse("Ne postoji izvještaj", { status: 404 });
 
   const round = report.round;
 
-  const { data: teams } = await supabase.from("teams").select("id, name");
+  const { data: teams } = await supabase.from("teams").select("id,name");
   const teamName = new Map<number, string>();
-  (teams || []).forEach((t) => teamName.set(t.id, t.name));
+  (teams || []).forEach(t => teamName.set(t.id, t.name));
 
   const { data: fixtures } = await supabase
     .from("fixtures")
     .select(`
-      id,
-      league_code,
-      home_team_id,
-      away_team_id,
+      id, league_code, home_team_id, away_team_id,
       results:results!left ( home_goals, away_goals )
     `)
     .eq("round", round);
 
-  const { data: standings } = await supabase.from("standings").select("*");
+  const { data: standings } = await supabase
+    .from("standings")
+    .select("*");
 
-  const simpleTable = (rows: string[][]) =>
+  const table = (rows: string[][], header = false) =>
     new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: rows.map(
-        (r) =>
-          new TableRow({
-            children: r.map(
-              (c) =>
-                new TableCell({
+      rows: rows.map((r, i) =>
+        new TableRow({
+          children: r.map(c =>
+            new TableCell({
+              children: [
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
                   children: [
-                    new Paragraph({
-                      alignment: AlignmentType.CENTER,
-                      children: [new TextRun({ text: c })],
+                    new TextRun({
+                      text: c,
+                      bold: header && i === 0,
                     }),
                   ],
-                })
-            ),
-          })
+                }),
+              ],
+            })
+          ),
+        })
       ),
     });
 
   const sections = LEAGUES.map((lg, idx) => {
-    const leagueFixtures = (fixtures || []).filter(
-      (f) => f.league_code === lg.db
+    const fx = (fixtures || []).filter(f => f.league_code === lg.db);
+    const st = (standings || []).filter(s => s.league_code === lg.db);
+
+    const resultsTable = table(
+      [
+        ["Domaćin", "Gost", "Rezultat"],
+        ...fx.map(f => {
+          const r = Array.isArray(f.results) ? f.results[0] : f.results;
+          const score =
+            r && r.home_goals != null && r.away_goals != null
+              ? `${r.home_goals}:${r.away_goals}`
+              : "-:-";
+          return [
+            teamName.get(f.home_team_id) || "",
+            teamName.get(f.away_team_id) || "",
+            score,
+          ];
+        }),
+      ],
+      true
     );
 
-    const leagueStandings = (standings || []).filter(
-      (s) => s.league_code === lg.db
+    const standingsTable = table(
+      [
+        ["R.br", "Ekipa", "Bodovi"],
+        ...st
+          .sort((a, b) => b.bodovi - a.bodovi)
+          .map((s, i) => [
+            String(i + 1),
+            teamName.get(s.team_id) || "",
+            String(s.bodovi),
+          ]),
+      ],
+      true
     );
-
-    const resultsTable = simpleTable([
-      ["Domaćin", "Gost", "Rezultat"],
-      ...leagueFixtures.map((f) => {
-        const r = Array.isArray(f.results) ? f.results[0] : f.results;
-        const score =
-          r && r.home_goals != null && r.away_goals != null
-            ? `${r.home_goals}:${r.away_goals}`
-            : "-:-";
-
-        return [
-          teamName.get(f.home_team_id) || "",
-          teamName.get(f.away_team_id) || "",
-          score,
-        ];
-      }),
-    ]);
-
-    const standingsTable = simpleTable([
-      ["#", "Ekipa", "Bodovi"],
-      ...leagueStandings
-        .sort((a, b) => b.bodovi - a.bodovi)
-        .map((s, i) => [
-          String(i + 1),
-          teamName.get(s.team_id) || "",
-          String(s.bodovi),
-        ]),
-    ]);
 
     return {
       footers: {
@@ -141,25 +139,38 @@ export async function GET(
           alignment: AlignmentType.CENTER,
           children: [
             new TextRun({
-              text: `${lg.label} — ${round}. kolo`,
+              text: `Izvještaj nakon ${round}. kola`,
               bold: true,
               size: 32,
             }),
           ],
         }),
-
         new Paragraph({
+          alignment: AlignmentType.CENTER,
           children: [
-            new TextRun({ text: "Rezultati", bold: true }),
+            new TextRun({
+              text: "malonogometne lige Panadić 2025/26",
+              size: 22,
+            }),
           ],
         }),
+
+        new Paragraph({}),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [
+            new TextRun({
+              text: lg.label,
+              bold: true,
+              size: 28,
+            }),
+          ],
+        }),
+
+        new Paragraph({ children: [new TextRun({ text: `Rezultati ${round}. kola`, bold: true })] }),
         resultsTable,
 
-        new Paragraph({
-          children: [
-            new TextRun({ text: "Tablica", bold: true }),
-          ],
-        }),
+        new Paragraph({ children: [new TextRun({ text: `Tablica nakon ${round}. kola`, bold: true })] }),
         standingsTable,
       ],
     };
