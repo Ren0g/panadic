@@ -20,7 +20,6 @@ const hrDate = (str: string | null) =>
 
 const hrTime = (t: string | null) => (t ? t.slice(0, 5) : "");
 
-// stabilan rezultat (array / object)
 const getResult = (f: any) => {
   if (!f.results) return null;
   if (!Array.isArray(f.results)) {
@@ -43,7 +42,7 @@ export async function POST(request: Request) {
     const teamName = new Map<number, string>();
     (teams || []).forEach((t) => teamName.set(t.id, t.name));
 
-    // FIXTURES + RESULTS
+    // FIXTURES
     const { data: fixtures } = await supabase
       .from("fixtures")
       .select(`
@@ -87,27 +86,23 @@ export async function POST(request: Request) {
       if (fx.length === 0) return `<p>Nema utakmica.</p>`;
 
       return `
-      <table>
-        <thead>
-          <tr><th>Domaćin</th><th>Gost</th><th>Rezultat</th></tr>
-        </thead>
-        <tbody>
-          ${fx
-            .map((f, i) => {
-              const r = getResult(f);
-              const score =
-                r && r.home_goals != null && r.away_goals != null
-                  ? `${r.home_goals}:${r.away_goals}`
-                  : "-:-";
-              return `
-              <tr ${i % 2 ? 'class="shaded"' : ""}>
-                <td>${esc(teamName.get(f.home_team_id) || "")}</td>
-                <td>${esc(teamName.get(f.away_team_id) || "")}</td>
-                <td>${score}</td>
-              </tr>`;
-            })
-            .join("")}
-        </tbody>
+      <table class="data">
+        <tr><th>Domaćin</th><th>Gost</th><th>Rezultat</th></tr>
+        ${fx
+          .map((f, i) => {
+            const r = getResult(f);
+            const score =
+              r && r.home_goals != null && r.away_goals != null
+                ? `${r.home_goals}:${r.away_goals}`
+                : "-:-";
+            return `
+            <tr>
+              <td>${esc(teamName.get(f.home_team_id) || "")}</td>
+              <td>${esc(teamName.get(f.away_team_id) || "")}</td>
+              <td>${score}</td>
+            </tr>`;
+          })
+          .join("")}
       </table>`;
     };
 
@@ -126,32 +121,28 @@ export async function POST(request: Request) {
         );
 
       return `
-      <table>
-        <thead>
+      <table class="data">
+        <tr>
+          <th>#</th><th>Ekipa</th><th>UT</th><th>P</th><th>N</th><th>I</th>
+          <th>G+</th><th>G-</th><th>GR</th><th>B</th>
+        </tr>
+        ${sorted
+          .map(
+            (s, i) => `
           <tr>
-            <th>#</th><th>Ekipa</th><th>UT</th><th>P</th><th>N</th><th>I</th>
-            <th>G+</th><th>G-</th><th>GR</th><th>B</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${sorted
-            .map(
-              (s, i) => `
-            <tr ${i % 2 ? 'class="shaded"' : ""}>
-              <td>${i + 1}</td>
-              <td>${esc(s.name)}</td>
-              <td>${s.ut}</td>
-              <td>${s.p}</td>
-              <td>${s.n}</td>
-              <td>${s.i}</td>
-              <td>${s.gplus}</td>
-              <td>${s.gminus}</td>
-              <td>${s.gr}</td>
-              <td>${s.bodovi}</td>
-            </tr>`
-            )
-            .join("")}
-        </tbody>
+            <td>${i + 1}</td>
+            <td>${esc(s.name)}</td>
+            <td>${s.ut}</td>
+            <td>${s.p}</td>
+            <td>${s.n}</td>
+            <td>${s.i}</td>
+            <td>${s.gplus}</td>
+            <td>${s.gminus}</td>
+            <td>${s.gr}</td>
+            <td>${s.bodovi}</td>
+          </tr>`
+          )
+          .join("")}
       </table>`;
     };
 
@@ -160,39 +151,41 @@ export async function POST(request: Request) {
       if (fx.length === 0) return `<p>Nema rasporeda.</p>`;
 
       return `
-      <table>
-        <thead>
-          <tr><th>Datum</th><th>Vrijeme</th><th>Domaćin</th><th>Gost</th></tr>
-        </thead>
-        <tbody>
-          ${fx
-            .map(
-              (f, i) => `
-            <tr ${i % 2 ? 'class="shaded"' : ""}>
-              <td>${hrDate(f.match_date)}</td>
-              <td>${hrTime(f.match_time)}</td>
-              <td>${esc(teamName.get(f.home_team_id) || "")}</td>
-              <td>${esc(teamName.get(f.away_team_id) || "")}</td>
-            </tr>`
-            )
-            .join("")}
-        </tbody>
+      <table class="data">
+        <tr><th>Datum</th><th>Vrijeme</th><th>Domaćin</th><th>Gost</th></tr>
+        ${fx
+          .map(
+            (f) => `
+          <tr>
+            <td>${hrDate(f.match_date)}</td>
+            <td>${hrTime(f.match_time)}</td>
+            <td>${esc(teamName.get(f.home_team_id) || "")}</td>
+            <td>${esc(teamName.get(f.away_team_id) || "")}</td>
+          </tr>`
+          )
+          .join("")}
       </table>`;
     };
 
     const leaguesHtml = LEAGUES.map(
       (lg, idx) => `
       ${idx > 0 ? `<div style="page-break-before:always"></div>` : ""}
-      <div class="league">
-        <h2>${lg.label}</h2>
-        <h3>Rezultati ${round}. kola</h3>
-        ${renderResults(lg.db)}
-        <h3>Tablica nakon ${round}. kola</h3>
-        ${renderStandings(lg.db)}
-        <h3>Iduće kolo (${round + 1}. kolo)</h3>
-        ${renderNext(lg.db)}
-        <div class="footer">panadic.vercel.app</div>
-      </div>`
+      <table class="page">
+        <tr>
+          <td class="content">
+            <h2>${lg.label}</h2>
+            <h3>Rezultati ${round}. kola</h3>
+            ${renderResults(lg.db)}
+            <h3>Tablica nakon ${round}. kola</h3>
+            ${renderStandings(lg.db)}
+            <h3>Iduće kolo (${round + 1}. kolo)</h3>
+            ${renderNext(lg.db)}
+          </td>
+        </tr>
+        <tr>
+          <td class="footer">panadic.vercel.app</td>
+        </tr>
+      </table>`
     ).join("");
 
     const html = `
@@ -202,40 +195,68 @@ export async function POST(request: Request) {
 <meta charset="UTF-8" />
 <title>izvjestaj_kolo_${round}</title>
 <style>
-  body { font-family: system-ui; margin:16px; color:#222; }
-  h1 { text-align:center; margin:0 0 8px; font-size:22px; color:#0A5E2A; }
-  h2 { text-align:center; margin:10px 0 6px; font-size:18px; color:#0A5E2A; }
-  h3 { margin:6px 0 4px; font-size:14px; color:#0A5E2A; }
-
-  table {
-    width:100%;
-    border-collapse:collapse;
-    font-size:11px;
-    margin-top:2px;
-    margin-bottom:8px;
+  body {
+    font-family: Arial, sans-serif;
+    margin: 20mm;
+    color: #222;
   }
 
-  th, td {
-    padding:3px 4px;
-    border-bottom:1px solid #eee;
-    text-align:center;
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    margin: 0 0 6mm;
+    color: #0A5E2A;
   }
 
-  h3 + table { margin-top:2px; }
+  h2 {
+    text-align: center;
+    font-size: 18px;
+    margin: 4mm 0;
+    color: #0A5E2A;
+  }
 
-  .shaded { background:#FFF8F2; }
+  h3 {
+    font-size: 14px;
+    margin: 3mm 0 2mm;
+    color: #0A5E2A;
+  }
 
-  .footer {
-    text-align:center;
-    font-size:11px;
-    color:#F37C22;
-    margin-top:6px;
+  table.page {
+    width: 100%;
+    height: 100%;
+    border-collapse: collapse;
+  }
+
+  td.content {
+    vertical-align: top;
+  }
+
+  td.footer {
+    vertical-align: bottom;
+    text-align: center;
+    font-size: 11px;
+    color: #F37C22;
+    padding-top: 6mm;
+  }
+
+  table.data {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-bottom: 4mm;
+  }
+
+  table.data th,
+  table.data td {
+    border-bottom: 1px solid #ddd;
+    padding: 2mm 2mm;
+    text-align: center;
   }
 </style>
 </head>
 <body>
   <h1>Izvještaj nakon ${round}. kola</h1>
-  <div style="text-align:center;color:#F37C22;margin-bottom:8px;">
+  <div style="text-align:center;color:#F37C22;margin-bottom:6mm;">
     malonogometne lige Panadić 2025/26
   </div>
   ${leaguesHtml}
