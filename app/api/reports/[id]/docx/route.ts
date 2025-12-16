@@ -77,7 +77,7 @@ export async function GET(
                   children: [
                     new Paragraph({
                       alignment: AlignmentType.CENTER,
-                      children: [new TextRun(c)],
+                      children: [new TextRun({ text: c })],
                     }),
                   ],
                 })
@@ -129,7 +129,7 @@ export async function GET(
           children: [
             new Paragraph({
               alignment: AlignmentType.CENTER,
-              children: [new TextRun("panadic.vercel.app")],
+              children: [new TextRun({ text: "panadic.vercel.app" })],
             }),
           ],
         }),
@@ -148,10 +148,24 @@ export async function GET(
           ],
         }),
 
-        new Paragraph({ children: [new TextRun("Rezultati", { bold: true })] }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "Rezultati",
+              bold: true,
+            }),
+          ],
+        }),
         resultsTable,
 
-        new Paragraph({ children: [new TextRun("Tablica", { bold: true })] }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "Tablica",
+              bold: true,
+            }),
+          ],
+        }),
         standingsTable,
       ],
     };
