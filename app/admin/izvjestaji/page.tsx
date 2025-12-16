@@ -187,6 +187,15 @@ export default function ReportsPage() {
                   Preuzmi HTML
                 </a>
 
+                {/* ✅ NOVI GUMB — WORD */}
+                <a
+                  href={`/api/reports/${r.id}/word`}
+                  className="px-3 py-1 rounded-full border border-[#c8b59a] 
+                             bg-white text-[#0A5E2A]"
+                >
+                  Preuzmi Word
+                </a>
+
                 <button
                   onClick={() => deleteReport(r.id)}
                   className="px-3 py-1 rounded-full bg-red-600 text-white 
