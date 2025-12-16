@@ -150,20 +150,14 @@ export async function GET(
 
         new Paragraph({
           children: [
-            new TextRun({
-              text: "Rezultati",
-              bold: true,
-            }),
+            new TextRun({ text: "Rezultati", bold: true }),
           ],
         }),
         resultsTable,
 
         new Paragraph({
           children: [
-            new TextRun({
-              text: "Tablica",
-              bold: true,
-            }),
+            new TextRun({ text: "Tablica", bold: true }),
           ],
         }),
         standingsTable,
@@ -173,8 +167,9 @@ export async function GET(
 
   const doc = new Document({ sections });
   const buffer = await Packer.toBuffer(doc);
+  const uint8 = new Uint8Array(buffer);
 
-  return new NextResponse(buffer, {
+  return new NextResponse(uint8, {
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
