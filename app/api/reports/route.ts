@@ -1,4 +1,3 @@
-// app/api/reports/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -6,13 +5,14 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// GET -> lista svih izvještaja (id, season, round, created_at)
+// GET -> lista svih izvještaja (PO JEDNA LIGA)
 export async function GET() {
   const { data, error } = await supabase
     .from("reports")
-    .select("id, season, round, created_at")
+    .select("id, season, round, league, created_at")
     .order("season", { ascending: false })
-    .order("round", { ascending: false });
+    .order("round", { ascending: false })
+    .order("league", { ascending: true });
 
   if (error) {
     console.error("Greška pri dohvaćanju reports:", error);
@@ -26,6 +26,7 @@ export async function GET() {
 export async function DELETE(request: Request) {
   const url = new URL(request.url);
   const idParam = url.searchParams.get("id");
+
   if (!idParam) {
     return new NextResponse("Nedostaje id", { status: 400 });
   }
@@ -35,7 +36,10 @@ export async function DELETE(request: Request) {
     return new NextResponse("Neispravan id", { status: 400 });
   }
 
-  const { error } = await supabase.from("reports").delete().eq("id", id);
+  const { error } = await supabase
+    .from("reports")
+    .delete()
+    .eq("id", id);
 
   if (error) {
     console.error("Greška pri brisanju izvještaja:", error);
