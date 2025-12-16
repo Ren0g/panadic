@@ -20,16 +20,12 @@ const hrDate = (str: string | null) =>
 
 const hrTime = (t: string | null) => (t ? t.slice(0, 5) : "");
 
-// --- FIX: Stabilan getResult ---
+// --- Stabilan getResult ---
 const getResult = (f: any) => {
   if (!f.results) return null;
-
-  // If Supabase returns a single object instead of array
   if (!Array.isArray(f.results)) {
     return f.results.fixture_id === f.id ? f.results : null;
   }
-
-  // Normal case: array
   return f.results.find((r: any) => r.fixture_id === f.id) || null;
 };
 
@@ -38,18 +34,16 @@ export async function POST(request: Request) {
     const url = new URL(request.url);
     const round = Number(url.searchParams.get("round"));
 
-    if (!round || isNaN(round))
+    if (!round || isNaN(round)) {
       return new NextResponse("Nedostaje broj kola.", { status: 400 });
+    }
 
-    // --- TEAMS ---
-    const { data: teams } = await supabase
-      .from("teams")
-      .select("id, name");
-
+    // TEAMS
+    const { data: teams } = await supabase.from("teams").select("id, name");
     const teamName = new Map<number, string>();
     (teams || []).forEach((t) => teamName.set(t.id, t.name));
 
-    // --- FIXTURES (LEFT JOIN RESULTS) ---
+    // FIXTURES
     const { data: fixtures } = await supabase
       .from("fixtures")
       .select(`
@@ -72,12 +66,12 @@ export async function POST(request: Request) {
       .order("match_date")
       .order("match_time");
 
-    // --- STANDINGS ---
+    // STANDINGS
     const { data: standings } = await supabase
       .from("standings")
       .select("*");
 
-    // --- NEXT ROUND FIXTURES ---
+    // NEXT ROUND
     const { data: nextFixtures } = await supabase
       .from("fixtures")
       .select("*")
@@ -86,55 +80,42 @@ export async function POST(request: Request) {
       .order("match_time");
 
     const esc = (s: string) =>
-      s.replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-    // --- RENDER: RESULTS ---
     const renderResults = (lg: string) => {
       const fx = (fixtures || []).filter((f) => f.league_code === lg);
-
-      if (fx.length === 0)
-        return `<p>Nema utakmica u ovom kolu.</p>`;
-
-      const rows = fx
-        .map((f, i) => {
-          const r = getResult(f);
-
-          const score =
-            r && r.home_goals != null && r.away_goals != null
-              ? `${r.home_goals}:${r.away_goals}`
-              : "-:-";
-
-          return `
-          <tr ${i % 2 ? 'class="shaded"' : ""}>
-            <td class="left">${esc(teamName.get(f.home_team_id) || "")}</td>
-            <td class="left">${esc(teamName.get(f.away_team_id) || "")}</td>
-            <td class="center">${score}</td>
-          </tr>`;
-        })
-        .join("");
+      if (fx.length === 0) return `<p>Nema utakmica.</p>`;
 
       return `
       <table>
         <thead>
-          <tr class="header">
-            <th>Domaćin</th>
-            <th>Gost</th>
-            <th class="center">Rezultat</th>
-          </tr>
+          <tr><th>Domaćin</th><th>Gost</th><th>Rezultat</th></tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>
+          ${fx
+            .map((f, i) => {
+              const r = getResult(f);
+              const score =
+                r && r.home_goals != null && r.away_goals != null
+                  ? `${r.home_goals}:${r.away_goals}`
+                  : "-:-";
+              return `
+              <tr ${i % 2 ? 'class="shaded"' : ""}>
+                <td>${esc(teamName.get(f.home_team_id) || "")}</td>
+                <td>${esc(teamName.get(f.away_team_id) || "")}</td>
+                <td>${score}</td>
+              </tr>`;
+            })
+            .join("")}
+        </tbody>
       </table>`;
     };
 
-    // --- RENDER: STANDINGS ---
     const renderStandings = (lg: string) => {
       const st = (standings || []).filter((s) => s.league_code === lg);
-
       if (st.length === 0) return `<p>Nema tablice.</p>`;
 
-      const enr = st
+      const sorted = st
         .map((s) => ({ ...s, name: teamName.get(s.team_id) || "" }))
         .sort(
           (a, b) =>
@@ -144,78 +125,60 @@ export async function POST(request: Request) {
             a.name.localeCompare(b.name)
         );
 
-      const rows = enr
-        .map(
-          (s, i) => `
-        <tr ${i % 2 ? 'class="shaded"' : ""}>
-          <td class="center">${i + 1}</td>
-          <td class="left">${esc(s.name)}</td>
-          <td class="center">${s.ut}</td>
-          <td class="center">${s.p}</td>
-          <td class="center">${s.n}</td>
-          <td class="center">${s.i}</td>
-          <td class="center">${s.gplus}</td>
-          <td class="center">${s.gminus}</td>
-          <td class="center">${s.gr}</td>
-          <td class="center">${s.bodovi}</td>
-        </tr>`
-        )
-        .join("");
-
       return `
       <table>
         <thead>
-          <tr class="header">
-            <th>R.br</th>
-            <th>Ekipa</th>
-            <th>UT</th>
-            <th>P</th>
-            <th>N</th>
-            <th>I</th>
-            <th>G+</th>
-            <th>G-</th>
-            <th>GR</th>
-            <th>Bodovi</th>
+          <tr>
+            <th>#</th><th>Ekipa</th><th>UT</th><th>P</th><th>N</th><th>I</th>
+            <th>G+</th><th>G-</th><th>GR</th><th>B</th>
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>
+          ${sorted
+            .map(
+              (s, i) => `
+            <tr ${i % 2 ? 'class="shaded"' : ""}>
+              <td>${i + 1}</td>
+              <td>${esc(s.name)}</td>
+              <td>${s.ut}</td>
+              <td>${s.p}</td>
+              <td>${s.n}</td>
+              <td>${s.i}</td>
+              <td>${s.gplus}</td>
+              <td>${s.gminus}</td>
+              <td>${s.gr}</td>
+              <td>${s.bodovi}</td>
+            </tr>`
+            )
+            .join("")}
+        </tbody>
       </table>`;
     };
 
-    // --- RENDER: NEXT ROUND ---
     const renderNext = (lg: string) => {
       const fx = (nextFixtures || []).filter((f) => f.league_code === lg);
-
       if (fx.length === 0) return `<p>Nema rasporeda.</p>`;
-
-      const rows = fx
-        .map(
-          (f, i) => `
-        <tr ${i % 2 ? 'class="shaded"' : ""}>
-          <td class="center">${hrDate(f.match_date)}</td>
-          <td class="center">${hrTime(f.match_time)}</td>
-          <td class="left">${esc(teamName.get(f.home_team_id) || "")}</td>
-          <td class="left">${esc(teamName.get(f.away_team_id) || "")}</td>
-        </tr>`
-        )
-        .join("");
 
       return `
       <table>
         <thead>
-          <tr class="header">
-            <th>Datum</th>
-            <th>Vrijeme</th>
-            <th>Domaćin</th>
-            <th>Gost</th>
-          </tr>
+          <tr><th>Datum</th><th>Vrijeme</th><th>Domaćin</th><th>Gost</th></tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>
+          ${fx
+            .map(
+              (f, i) => `
+            <tr ${i % 2 ? 'class="shaded"' : ""}>
+              <td>${hrDate(f.match_date)}</td>
+              <td>${hrTime(f.match_time)}</td>
+              <td>${esc(teamName.get(f.home_team_id) || "")}</td>
+              <td>${esc(teamName.get(f.away_team_id) || "")}</td>
+            </tr>`
+            )
+            .join("")}
+        </tbody>
       </table>`;
     };
-
-    // --- PAGE HTML ---
-    const title = `izvjestaj_kolo_${round}`;
 
     const leaguesHtml = LEAGUES.map(
       (lg) => `
@@ -227,6 +190,7 @@ export async function POST(request: Request) {
         ${renderStandings(lg.db)}
         <h3>Iduće kolo (${round + 1}. kolo)</h3>
         ${renderNext(lg.db)}
+        <footer>panadic.vercel.app</footer>
       </section>`
     ).join("");
 
@@ -235,52 +199,39 @@ export async function POST(request: Request) {
 <html lang="hr">
 <head>
 <meta charset="UTF-8" />
-<title>${title}</title>
-<meta name="file-name" content="${title}.pdf" />
+<title>izvjestaj_kolo_${round}</title>
 <style>
-  body { font-family: system-ui; margin: 40px; color:#222; }
-  h1 { text-align:center; color:#0A5E2A; }
-  h2 { text-align:center; color:#0A5E2A; margin-top:40px; }
-  h3 { color:#0A5E2A; margin-top:25px; margin-bottom:8px; }
-  table { width:100%; border-collapse:collapse; margin-bottom:20px; font-size:12px; table-layout: fixed; }
-  th, td { padding:4px 6px; border-bottom:1px solid #eee; text-align:center; }
-  td.left { text-align:center !important; }
+  body { font-family: system-ui; margin:16px; color:#222; }
+  h1 { text-align:center; margin:0 0 8px; font-size:22px; color:#0A5E2A; }
+  h2 { text-align:center; margin:16px 0 6px; font-size:18px; color:#0A5E2A; }
+  h3 { margin:10px 0 4px; font-size:14px; color:#0A5E2A; }
+  table { width:100%; border-collapse:collapse; font-size:11px; margin-bottom:12px; }
+  th, td { padding:3px 4px; border-bottom:1px solid #eee; text-align:center; }
   .shaded { background:#FFF8F2; }
-  .league-section { page-break-after:always; }
-  .league-section:last-of-type { page-break-after:auto; }
-  footer {
-    position: fixed;
-    bottom: 20px;
-    left: 0;
-    right: 0;
-    text-align:center;
-    color:#F37C22;
-    font-size:12px;
-  }
+  .league-section { page-break-before:always; }
+  .league-section:first-of-type { page-break-before:auto; }
+  footer { margin-top:12px; text-align:center; font-size:11px; color:#F37C22; }
 </style>
 </head>
-
-<body data-round="${round}">
+<body>
   <h1>Izvještaj nakon ${round}. kola</h1>
-  <div style="text-align:center;color:#F37C22;margin-bottom:20px;">
+  <div style="text-align:center;color:#F37C22;margin-bottom:10px;">
     malonogometne lige Panadić 2025/26
   </div>
-
   ${leaguesHtml}
-
-  <footer>panadic.vercel.app</footer>
 </body>
 </html>
 `;
 
-    // SPREMI U BAZU
     const { data: inserted, error } = await supabase
       .from("reports")
       .insert({ season: "2025/26", round, html })
       .select("id, season, round, created_at")
       .single();
 
-    if (error) return new NextResponse("Greška pri spremanju HTML-a.", { status: 500 });
+    if (error) {
+      return new NextResponse("Greška pri spremanju HTML-a.", { status: 500 });
+    }
 
     return NextResponse.json(inserted);
   } catch (e) {
