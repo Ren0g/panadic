@@ -28,25 +28,40 @@ const getResult = (f: any) => {
 export async function POST(request: Request) {
   try {
     const round = Number(new URL(request.url).searchParams.get("round"));
-    if (!round) return new NextResponse("Nedostaje kolo", { status: 400 });
+    if (!round) {
+      return new NextResponse("Nedostaje kolo", { status: 400 });
+    }
 
-    const { data: teams } = await supabase.from("teams").select("id,name");
+    // --- TEAMS ---
+    const { data: teams } = await supabase
+      .from("teams")
+      .select("id,name");
+
     const teamName = new Map<number, string>();
-    (teams || []).forEach(t => teamName.set(t.id, t.name));
+    (teams || []).forEach((t) => teamName.set(t.id, t.name));
 
+    // --- FIXTURES ---
     const { data: fixtures } = await supabase
       .from("fixtures")
       .select(`
-        id, league_code, match_date, match_time,
-        home_team_id, away_team_id,
+        id,
+        league_code,
+        match_date,
+        match_time,
+        home_team_id,
+        away_team_id,
         results:results!left ( home_goals, away_goals )
       `)
       .eq("round", round)
       .order("match_date")
       .order("match_time");
 
-    const { data: standings } = await supabase.from("standings").select("*");
+    // --- STANDINGS ---
+    const { data: standings } = await supabase
+      .from("standings")
+      .select("*");
 
+    // --- NEXT ROUND ---
     const { data: nextFixtures } = await supabase
       .from("fixtures")
       .select("*")
@@ -57,80 +72,27 @@ export async function POST(request: Request) {
     const esc = (s: string) =>
       s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-    const leaguesHtml = LEAGUES.map(
-      lg => `
-<div class="league">
-  <h2>${lg.label}</h2>
+    const insertedReports: any[] = [];
 
-  <h3>Rezultati ${round}. kola</h3>
-  <table>
-    <thead>
-      <tr><th>Domaćin</th><th>Gost</th><th>Rezultat</th></tr>
-    </thead>
-    <tbody>
-      ${(fixtures || [])
-        .filter(f => f.league_code === lg.db)
-        .map(f => {
-          const r = getResult(f);
-          const score =
-            r && r.home_goals != null && r.away_goals != null
-              ? `${r.home_goals}:${r.away_goals}`
-              : "-:-";
-          return `<tr>
-            <td>${esc(teamName.get(f.home_team_id) || "")}</td>
-            <td>${esc(teamName.get(f.away_team_id) || "")}</td>
-            <td>${score}</td>
-          </tr>`;
-        }).join("")}
-    </tbody>
-  </table>
+    // =====================================================
+    // GENERIRAJ POSEBAN IZVJEŠTAJ ZA SVAKU LIGU
+    // =====================================================
+    for (const lg of LEAGUES) {
+      const leagueFixtures = (fixtures || []).filter(
+        (f) => f.league_code === lg.db
+      );
 
-  <h3>Tablica nakon ${round}. kola</h3>
-  <table>
-    <thead>
-      <tr>
-        <th>#</th><th>Ekipa</th><th>UT</th><th>P</th><th>N</th><th>I</th>
-        <th>G+</th><th>G-</th><th>GR</th><th>B</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${(standings || [])
-        .filter(s => s.league_code === lg.db)
-        .sort((a,b)=>b.bodovi-a.bodovi || b.gr-a.gr)
-        .map((s,i)=>`
-        <tr>
-          <td>${i+1}</td>
-          <td>${esc(teamName.get(s.team_id)||"")}</td>
-          <td>${s.ut}</td><td>${s.p}</td><td>${s.n}</td><td>${s.i}</td>
-          <td>${s.gplus}</td><td>${s.gminus}</td><td>${s.gr}</td><td>${s.bodovi}</td>
-        </tr>`).join("")}
-    </tbody>
-  </table>
+      if (leagueFixtures.length === 0) continue;
 
-  <h3>Iduće kolo (${round+1}. kolo)</h3>
-  <table>
-    <thead>
-      <tr><th>Datum</th><th>Vrijeme</th><th>Domaćin</th><th>Gost</th></tr>
-    </thead>
-    <tbody>
-      ${(nextFixtures || [])
-        .filter(f => f.league_code === lg.db)
-        .map(f=>`
-        <tr>
-          <td>${hrDate(f.match_date)}</td>
-          <td>${hrTime(f.match_time)}</td>
-          <td>${esc(teamName.get(f.home_team_id)||"")}</td>
-          <td>${esc(teamName.get(f.away_team_id)||"")}</td>
-        </tr>`).join("")}
-    </tbody>
-  </table>
+      const leagueStandings = (standings || [])
+        .filter((s) => s.league_code === lg.db)
+        .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
 
-  <div class="footer">panadic.vercel.app</div>
-</div>
-`
-    ).join("");
+      const leagueNext = (nextFixtures || []).filter(
+        (f) => f.league_code === lg.db
+      );
 
-    const html = `<!DOCTYPE html>
+      const html = `<!DOCTYPE html>
 <html lang="hr">
 <head>
 <meta charset="UTF-8">
@@ -148,11 +110,11 @@ h1 {
 h2 {
   text-align:center;
   color:#0A5E2A;
-  margin-top:24px;
+  margin:16px 0;
 }
 h3 {
   color:#0A5E2A;
-  margin:16px 0 6px;
+  margin:14px 0 6px;
 }
 table {
   width:100%;
@@ -169,12 +131,6 @@ th {
   background:#f2f2f2;
   font-weight:bold;
 }
-.league {
-  page-break-after: always;
-}
-.league:last-child {
-  page-break-after: auto;
-}
 .footer {
   text-align:center;
   margin-top:16px;
@@ -184,22 +140,109 @@ th {
 </style>
 </head>
 <body>
+
 <h1>Izvještaj nakon ${round}. kola</h1>
-<div style="text-align:center;color:#F37C22;margin-bottom:16px;">
+<div style="text-align:center;color:#F37C22;margin-bottom:12px;">
 malonogometne lige Panadić 2025/26
 </div>
-${leaguesHtml}
+
+<h2>${lg.label}</h2>
+
+<h3>Rezultati ${round}. kola</h3>
+<table>
+<thead>
+<tr><th>Domaćin</th><th>Gost</th><th>Rezultat</th></tr>
+</thead>
+<tbody>
+${leagueFixtures
+  .map((f) => {
+    const r = getResult(f);
+    const score =
+      r && r.home_goals != null && r.away_goals != null
+        ? `${r.home_goals}:${r.away_goals}`
+        : "-:-";
+    return `<tr>
+      <td>${esc(teamName.get(f.home_team_id) || "")}</td>
+      <td>${esc(teamName.get(f.away_team_id) || "")}</td>
+      <td>${score}</td>
+    </tr>`;
+  })
+  .join("")}
+</tbody>
+</table>
+
+<h3>Tablica nakon ${round}. kola</h3>
+<table>
+<thead>
+<tr>
+<th>#</th><th>Ekipa</th><th>UT</th><th>P</th><th>N</th><th>I</th>
+<th>G+</th><th>G-</th><th>GR</th><th>B</th>
+</tr>
+</thead>
+<tbody>
+${leagueStandings
+  .map(
+    (s, i) => `<tr>
+<td>${i + 1}</td>
+<td>${esc(teamName.get(s.team_id) || "")}</td>
+<td>${s.ut}</td>
+<td>${s.p}</td>
+<td>${s.n}</td>
+<td>${s.i}</td>
+<td>${s.gplus}</td>
+<td>${s.gminus}</td>
+<td>${s.gr}</td>
+<td>${s.bodovi}</td>
+</tr>`
+  )
+  .join("")}
+</tbody>
+</table>
+
+<h3>Iduće kolo (${round + 1}. kolo)</h3>
+<table>
+<thead>
+<tr><th>Datum</th><th>Vrijeme</th><th>Domaćin</th><th>Gost</th></tr>
+</thead>
+<tbody>
+${leagueNext
+  .map(
+    (f) => `<tr>
+<td>${hrDate(f.match_date)}</td>
+<td>${hrTime(f.match_time)}</td>
+<td>${esc(teamName.get(f.home_team_id) || "")}</td>
+<td>${esc(teamName.get(f.away_team_id) || "")}</td>
+</tr>`
+  )
+  .join("")}
+</tbody>
+</table>
+
+<div class="footer">panadic.vercel.app</div>
+
 </body>
 </html>`;
 
-    const { data: inserted, error } = await supabase
-      .from("reports")
-      .insert({ season: "2025/26", round, html })
-      .select("id")
-      .single();
+      const { data, error } = await supabase
+        .from("reports")
+        .insert({
+          season: "2025/26",
+          round,
+          league: lg.db,
+          html,
+        })
+        .select("id")
+        .single();
 
-    if (error) return new NextResponse("Greška pri spremanju", { status: 500 });
-    return NextResponse.json(inserted);
+      if (!error && data) {
+        insertedReports.push(data);
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      count: insertedReports.length,
+    });
   } catch (e) {
     console.error(e);
     return new NextResponse("Neočekivana greška", { status: 500 });
