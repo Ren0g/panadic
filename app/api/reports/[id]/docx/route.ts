@@ -11,6 +11,7 @@ import {
   WidthType,
   AlignmentType,
   Footer,
+  PageBreak,
 } from "docx";
 
 const supabase = createClient(
@@ -31,9 +32,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const reportId = Number(params.id);
-  if (!Number.isFinite(reportId)) {
-    return new NextResponse("Neispravan ID", { status: 400 });
-  }
+  if (!reportId) return new NextResponse("Neispravan ID", { status: 400 });
 
   const { data: report } = await supabase
     .from("reports")
@@ -41,9 +40,7 @@ export async function GET(
     .eq("id", reportId)
     .single();
 
-  if (!report) {
-    return new NextResponse("Izvještaj ne postoji", { status: 404 });
-  }
+  if (!report) return new NextResponse("Ne postoji izvještaj", { status: 404 });
 
   const round = report.round;
 
@@ -54,28 +51,39 @@ export async function GET(
   const { data: fixtures } = await supabase
     .from("fixtures")
     .select(`
-      league_code,
-      home_team_id,
-      away_team_id,
+      id, league_code, match_date, match_time,
+      home_team_id, away_team_id,
       results:results!left ( home_goals, away_goals )
     `)
     .eq("round", round);
 
-  const { data: standings } = await supabase.from("standings").select("*");
+  const { data: nextFixtures } = await supabase
+    .from("fixtures")
+    .select(`
+      league_code, match_date, match_time,
+      home_team_id, away_team_id
+    `)
+    .eq("round", round + 1)
+    .order("match_date")
+    .order("match_time");
+
+  const { data: standings } = await supabase
+    .from("standings")
+    .select("*");
 
   const makeTable = (rows: string[][], header = false) =>
     new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: rows.map((row, i) =>
+      rows: rows.map((r, i) =>
         new TableRow({
-          children: row.map(cell =>
+          children: r.map(c =>
             new TableCell({
               children: [
                 new Paragraph({
                   alignment: AlignmentType.CENTER,
                   children: [
                     new TextRun({
-                      text: cell,
+                      text: c,
                       bold: header && i === 0,
                     }),
                   ],
@@ -87,11 +95,10 @@ export async function GET(
       ),
     });
 
-  const sections = LEAGUES.map(lg => {
+  const sections = LEAGUES.map((lg, idx) => {
     const fx = (fixtures || []).filter(f => f.league_code === lg.db);
-    const st = (standings || [])
-      .filter(s => s.league_code === lg.db)
-      .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
+    const st = (standings || []).filter(s => s.league_code === lg.db);
+    const nx = (nextFixtures || []).filter(f => f.league_code === lg.db);
 
     const resultsTable = makeTable(
       [
@@ -114,11 +121,28 @@ export async function GET(
 
     const standingsTable = makeTable(
       [
-        ["#", "Ekipa", "Bodovi"],
-        ...st.map((s, i) => [
-          String(i + 1),
-          teamName.get(s.team_id) || "",
-          String(s.bodovi),
+        ["R.br", "Ekipa", "Bodovi"],
+        ...st
+          .sort((a, b) => b.bodovi - a.bodovi)
+          .map((s, i) => [
+            String(i + 1),
+            teamName.get(s.team_id) || "",
+            String(s.bodovi),
+          ]),
+      ],
+      true
+    );
+
+    const nextRoundTable = makeTable(
+      [
+        ["Datum", "Vrijeme", "Domaćin", "Gost"],
+        ...nx.map(f => [
+          f.match_date
+            ? new Date(f.match_date).toLocaleDateString("hr-HR")
+            : "",
+          f.match_time?.slice(0, 5) || "",
+          teamName.get(f.home_team_id) || "",
+          teamName.get(f.away_team_id) || "",
         ]),
       ],
       true
@@ -136,6 +160,8 @@ export async function GET(
         }),
       },
       children: [
+        ...(idx > 0 ? [new Paragraph({ children: [new PageBreak()] })] : []),
+
         new Paragraph({
           alignment: AlignmentType.CENTER,
           children: [
@@ -177,6 +203,11 @@ export async function GET(
           children: [new TextRun({ text: `Tablica nakon ${round}. kola`, bold: true })],
         }),
         standingsTable,
+
+        new Paragraph({
+          children: [new TextRun({ text: `Iduće kolo (${round + 1}. kolo)`, bold: true })],
+        }),
+        nextRoundTable,
       ],
     };
   });
