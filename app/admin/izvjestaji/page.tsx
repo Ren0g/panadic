@@ -85,8 +85,6 @@ export default function ReportsPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
-
-      {/* HEADER */}
       <h1 className="text-3xl font-bold text-[#0A5E2A] mb-1">
         Arhiva izvještaja — sezona 2025/26
       </h1>
@@ -94,10 +92,7 @@ export default function ReportsPage() {
         Pregled svih automatski generiranih izvještaja po kolima.
       </p>
 
-      {/* TOOLS BAR */}
       <div className="flex flex-wrap items-center gap-4 mb-8">
-
-        {/* BACK */}
         <button
           onClick={() => (window.location.href = "/admin")}
           className="px-4 py-2 rounded-full bg-[#f7f1e6] border border-[#c8b59a] 
@@ -106,7 +101,6 @@ export default function ReportsPage() {
           ← Natrag na Admin panel
         </button>
 
-        {/* SELECT ROUND */}
         <select
           value={round}
           onChange={(e) => setRound(Number(e.target.value))}
@@ -119,7 +113,6 @@ export default function ReportsPage() {
           ))}
         </select>
 
-        {/* GENERATE BUTTON */}
         <button
           onClick={generateReport}
           disabled={generating}
@@ -142,7 +135,6 @@ export default function ReportsPage() {
         <div className="text-gray-600">Još nema spremljenih izvještaja.</div>
       )}
 
-      {/* REPORT LIST */}
       {reports.length > 0 && (
         <div className="bg-[#f7f1e6] border border-[#c8b59a] rounded-xl p-5 space-y-4">
           <h2 className="text-xl font-semibold text-[#0A5E2A] mb-2">
@@ -187,6 +179,15 @@ export default function ReportsPage() {
                   Preuzmi HTML
                 </a>
 
+                {/* ✅ NOVO — WORD */}
+                <a
+                  href={`/api/reports/${r.id}/docx`}
+                  className="px-3 py-1 rounded-full border border-[#c8b59a] 
+                             bg-white text-[#0A5E2A]"
+                >
+                  Preuzmi Word
+                </a>
+
                 <button
                   onClick={() => deleteReport(r.id)}
                   className="px-3 py-1 rounded-full bg-red-600 text-white 
@@ -200,7 +201,6 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* FOOTER SPACING */}
       <div className="h-16" />
     </div>
   );
