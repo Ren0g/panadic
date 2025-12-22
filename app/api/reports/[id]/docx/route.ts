@@ -11,7 +11,6 @@ import {
   WidthType,
   AlignmentType,
   Footer,
-  PageBreak,
 } from "docx";
 
 const supabase = createClient(
@@ -32,7 +31,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const reportId = Number(params.id);
-  if (!reportId) return new NextResponse("Neispravan ID", { status: 400 });
+  if (!Number.isFinite(reportId)) {
+    return new NextResponse("Neispravan ID", { status: 400 });
+  }
 
   const { data: report } = await supabase
     .from("reports")
@@ -40,7 +41,9 @@ export async function GET(
     .eq("id", reportId)
     .single();
 
-  if (!report) return new NextResponse("Ne postoji izvještaj", { status: 404 });
+  if (!report) {
+    return new NextResponse("Izvještaj ne postoji", { status: 404 });
+  }
 
   const round = report.round;
 
@@ -51,28 +54,28 @@ export async function GET(
   const { data: fixtures } = await supabase
     .from("fixtures")
     .select(`
-      id, league_code, home_team_id, away_team_id,
+      league_code,
+      home_team_id,
+      away_team_id,
       results:results!left ( home_goals, away_goals )
     `)
     .eq("round", round);
 
-  const { data: standings } = await supabase
-    .from("standings")
-    .select("*");
+  const { data: standings } = await supabase.from("standings").select("*");
 
-  const table = (rows: string[][], header = false) =>
+  const makeTable = (rows: string[][], header = false) =>
     new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: rows.map((r, i) =>
+      rows: rows.map((row, i) =>
         new TableRow({
-          children: r.map(c =>
+          children: row.map(cell =>
             new TableCell({
               children: [
                 new Paragraph({
                   alignment: AlignmentType.CENTER,
                   children: [
                     new TextRun({
-                      text: c,
+                      text: cell,
                       bold: header && i === 0,
                     }),
                   ],
@@ -84,11 +87,13 @@ export async function GET(
       ),
     });
 
-  const sections = LEAGUES.map((lg, idx) => {
+  const sections = LEAGUES.map(lg => {
     const fx = (fixtures || []).filter(f => f.league_code === lg.db);
-    const st = (standings || []).filter(s => s.league_code === lg.db);
+    const st = (standings || [])
+      .filter(s => s.league_code === lg.db)
+      .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
 
-    const resultsTable = table(
+    const resultsTable = makeTable(
       [
         ["Domaćin", "Gost", "Rezultat"],
         ...fx.map(f => {
@@ -107,16 +112,14 @@ export async function GET(
       true
     );
 
-    const standingsTable = table(
+    const standingsTable = makeTable(
       [
-        ["R.br", "Ekipa", "Bodovi"],
-        ...st
-          .sort((a, b) => b.bodovi - a.bodovi)
-          .map((s, i) => [
-            String(i + 1),
-            teamName.get(s.team_id) || "",
-            String(s.bodovi),
-          ]),
+        ["#", "Ekipa", "Bodovi"],
+        ...st.map((s, i) => [
+          String(i + 1),
+          teamName.get(s.team_id) || "",
+          String(s.bodovi),
+        ]),
       ],
       true
     );
@@ -127,14 +130,12 @@ export async function GET(
           children: [
             new Paragraph({
               alignment: AlignmentType.CENTER,
-              children: [new TextRun({ text: "panadic.vercel.app" })],
+              children: [new TextRun("panadic.vercel.app")],
             }),
           ],
         }),
       },
       children: [
-        ...(idx > 0 ? [new Paragraph({ children: [new PageBreak()] })] : []),
-
         new Paragraph({
           alignment: AlignmentType.CENTER,
           children: [
@@ -167,10 +168,14 @@ export async function GET(
           ],
         }),
 
-        new Paragraph({ children: [new TextRun({ text: `Rezultati ${round}. kola`, bold: true })] }),
+        new Paragraph({
+          children: [new TextRun({ text: `Rezultati ${round}. kola`, bold: true })],
+        }),
         resultsTable,
 
-        new Paragraph({ children: [new TextRun({ text: `Tablica nakon ${round}. kola`, bold: true })] }),
+        new Paragraph({
+          children: [new TextRun({ text: `Tablica nakon ${round}. kola`, bold: true })],
+        }),
         standingsTable,
       ],
     };
@@ -178,9 +183,8 @@ export async function GET(
 
   const doc = new Document({ sections });
   const buffer = await Packer.toBuffer(doc);
-  const uint8 = new Uint8Array(buffer);
 
-  return new NextResponse(uint8, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
