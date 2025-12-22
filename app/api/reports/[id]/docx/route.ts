@@ -11,7 +11,6 @@ import {
   WidthType,
   AlignmentType,
   Footer,
-  PageBreak,
 } from "docx";
 
 const supabase = createClient(
@@ -32,9 +31,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const reportId = Number(params.id);
-  if (!reportId) {
-    return new NextResponse("Neispravan ID", { status: 400 });
-  }
+  if (!reportId) return new NextResponse("Neispravan ID", { status: 400 });
 
   const { data: report } = await supabase
     .from("reports")
@@ -42,10 +39,7 @@ export async function GET(
     .eq("id", reportId)
     .single();
 
-  if (!report) {
-    return new NextResponse("Izvještaj ne postoji", { status: 404 });
-  }
-
+  if (!report) return new NextResponse("Ne postoji izvještaj", { status: 404 });
   const round = report.round;
 
   const { data: teams } = await supabase.from("teams").select("id,name");
@@ -55,20 +49,25 @@ export async function GET(
   const { data: fixtures } = await supabase
     .from("fixtures")
     .select(`
-      id,
-      league_code,
-      home_team_id,
-      away_team_id,
+      league_code, home_team_id, away_team_id,
       results:results!left ( home_goals, away_goals )
     `)
     .eq("round", round);
 
-  const { data: standings } = await supabase
-    .from("standings")
-    .select("*");
+  const { data: nextFixtures } = await supabase
+    .from("fixtures")
+    .select(`
+      league_code, match_date, match_time,
+      home_team_id, away_team_id
+    `)
+    .eq("round", round + 1)
+    .order("match_date")
+    .order("match_time");
+
+  const { data: standings } = await supabase.from("standings").select("*");
 
   // -------------------------------------------------------
-  // TABLE helper – JEDNA izmjena: equalCols
+  // TABLE helper – JEDINA promjena: equalCols
   // -------------------------------------------------------
   const table = (
     rows: string[][],
@@ -81,6 +80,7 @@ export async function GET(
         new TableRow({
           children: r.map((c, colIdx) =>
             new TableCell({
+              // Ako je kolona u equalCols -> forsiraj istu širinu
               width: equalCols.includes(colIdx)
                 ? { size: 6, type: WidthType.PERCENTAGE }
                 : undefined,
@@ -101,11 +101,10 @@ export async function GET(
       ),
     });
 
-  const sections = LEAGUES.map((lg, idx) => {
+  const sections = LEAGUES.map((lg) => {
     const fx = (fixtures || []).filter((f) => f.league_code === lg.db);
-    const st = (standings || [])
-      .filter((s) => s.league_code === lg.db)
-      .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
+    const st = (standings || []).filter((s) => s.league_code === lg.db);
+    const nx = (nextFixtures || []).filter((f) => f.league_code === lg.db);
 
     const resultsTable = table(
       [
@@ -129,21 +128,37 @@ export async function GET(
     const standingsTable = table(
       [
         ["R.br", "Ekipa", "UT", "P", "N", "I", "G+", "G-", "GR", "B"],
-        ...st.map((s, i) => [
-          String(i + 1),
-          teamName.get(s.team_id) || "",
-          String(s.ut),
-          String(s.p),
-          String(s.n),
-          String(s.i),
-          String(s.gplus),
-          String(s.gminus),
-          String(s.gr),
-          String(s.bodovi),
-        ]),
+        ...st
+          .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr)
+          .map((s, i) => [
+            String(i + 1),
+            teamName.get(s.team_id) || "",
+            String(s.ut),
+            String(s.p),
+            String(s.n),
+            String(s.i),
+            String(s.gplus),
+            String(s.gminus),
+            String(s.gr),
+            String(s.bodovi),
+          ]),
       ],
       true,
-      [2, 3, 4, 5, 6, 7, 8, 9] // ⬅ JEDNAKE ŠIRINE
+      // Jednake širine samo za UT,P,N,I,G+,G-,GR,B (kolone 2..9)
+      [2, 3, 4, 5, 6, 7, 8, 9]
+    );
+
+    const nextTable = table(
+      [
+        ["Datum", "Vrijeme", "Domaćin", "Gost"],
+        ...nx.map((f) => [
+          f.match_date ? new Date(f.match_date).toLocaleDateString("hr-HR") : "",
+          f.match_time?.slice(0, 5) || "",
+          teamName.get(f.home_team_id) || "",
+          teamName.get(f.away_team_id) || "",
+        ]),
+      ],
+      true
     );
 
     return {
@@ -158,8 +173,6 @@ export async function GET(
         }),
       },
       children: [
-        ...(idx > 0 ? [new Paragraph({ children: [new PageBreak()] })] : []),
-
         new Paragraph({
           alignment: AlignmentType.CENTER,
           children: [
@@ -172,39 +185,35 @@ export async function GET(
         }),
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [
-            new TextRun({
-              text: "malonogometne lige Panadić 2025/26",
-              size: 22,
-            }),
-          ],
+          children: [new TextRun("malonogometne lige Panadić 2025/26")],
         }),
 
         new Paragraph({}),
-
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [
-            new TextRun({
-              text: lg.label,
-              bold: true,
-              size: 28,
-            }),
-          ],
+          children: [new TextRun({ text: lg.label, bold: true, size: 28 })],
         }),
 
         new Paragraph({
-          children: [new TextRun({ text: `Rezultati ${round}. kola`, bold: true })],
+          children: [new TextRun({ text: "Rezultati", bold: true })],
         }),
         resultsTable,
 
-        new Paragraph({}),
+        new Paragraph({}), // PRAZAN RED
+
         new Paragraph({
-          children: [
-            new TextRun({ text: `Tablica nakon ${round}. kola`, bold: true }),
-          ],
+          children: [new TextRun({ text: "Tablica", bold: true })],
         }),
         standingsTable,
+
+        new Paragraph({}), // PRAZAN RED
+
+        new Paragraph({
+          children: [
+            new TextRun({ text: `Iduće kolo (${round + 1}. kolo)`, bold: true }),
+          ],
+        }),
+        nextTable,
       ],
     };
   });
