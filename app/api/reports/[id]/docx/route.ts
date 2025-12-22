@@ -11,7 +11,6 @@ import {
   WidthType,
   AlignmentType,
   Footer,
-  PageBreak,
 } from "docx";
 
 const supabase = createClient(
@@ -41,7 +40,6 @@ export async function GET(
     .single();
 
   if (!report) return new NextResponse("Ne postoji izvještaj", { status: 404 });
-
   const round = report.round;
 
   const { data: teams } = await supabase.from("teams").select("id,name");
@@ -51,8 +49,7 @@ export async function GET(
   const { data: fixtures } = await supabase
     .from("fixtures")
     .select(`
-      id, league_code, match_date, match_time,
-      home_team_id, away_team_id,
+      league_code, home_team_id, away_team_id,
       results:results!left ( home_goals, away_goals )
     `)
     .eq("round", round);
@@ -71,7 +68,7 @@ export async function GET(
     .from("standings")
     .select("*");
 
-  const makeTable = (rows: string[][], header = false) =>
+  const table = (rows: string[][], header = false) =>
     new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
       rows: rows.map((r, i) =>
@@ -95,12 +92,12 @@ export async function GET(
       ),
     });
 
-  const sections = LEAGUES.map((lg, idx) => {
+  const sections = LEAGUES.map(lg => {
     const fx = (fixtures || []).filter(f => f.league_code === lg.db);
     const st = (standings || []).filter(s => s.league_code === lg.db);
     const nx = (nextFixtures || []).filter(f => f.league_code === lg.db);
 
-    const resultsTable = makeTable(
+    const resultsTable = table(
       [
         ["Domaćin", "Gost", "Rezultat"],
         ...fx.map(f => {
@@ -119,21 +116,28 @@ export async function GET(
       true
     );
 
-    const standingsTable = makeTable(
+    const standingsTable = table(
       [
-        ["R.br", "Ekipa", "Bodovi"],
+        ["R.br", "Ekipa", "UT", "P", "N", "I", "G+", "G-", "GR", "B"],
         ...st
-          .sort((a, b) => b.bodovi - a.bodovi)
+          .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr)
           .map((s, i) => [
             String(i + 1),
             teamName.get(s.team_id) || "",
+            String(s.ut),
+            String(s.p),
+            String(s.n),
+            String(s.i),
+            String(s.gplus),
+            String(s.gminus),
+            String(s.gr),
             String(s.bodovi),
           ]),
       ],
       true
     );
 
-    const nextRoundTable = makeTable(
+    const nextTable = table(
       [
         ["Datum", "Vrijeme", "Domaćin", "Gost"],
         ...nx.map(f => [
@@ -160,8 +164,6 @@ export async function GET(
         }),
       },
       children: [
-        ...(idx > 0 ? [new Paragraph({ children: [new PageBreak()] })] : []),
-
         new Paragraph({
           alignment: AlignmentType.CENTER,
           children: [
@@ -175,10 +177,7 @@ export async function GET(
         new Paragraph({
           alignment: AlignmentType.CENTER,
           children: [
-            new TextRun({
-              text: "malonogometne lige Panadić 2025/26",
-              size: 22,
-            }),
+            new TextRun("malonogometne lige Panadić 2025/26"),
           ],
         }),
 
@@ -186,28 +185,24 @@ export async function GET(
         new Paragraph({
           alignment: AlignmentType.CENTER,
           children: [
-            new TextRun({
-              text: lg.label,
-              bold: true,
-              size: 28,
-            }),
+            new TextRun({ text: lg.label, bold: true, size: 28 }),
           ],
         }),
 
-        new Paragraph({
-          children: [new TextRun({ text: `Rezultati ${round}. kola`, bold: true })],
-        }),
+        new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true })] }),
         resultsTable,
 
-        new Paragraph({
-          children: [new TextRun({ text: `Tablica nakon ${round}. kola`, bold: true })],
-        }),
+        new Paragraph({}), // PRAZAN RED
+
+        new Paragraph({ children: [new TextRun({ text: "Tablica", bold: true })] }),
         standingsTable,
+
+        new Paragraph({}), // PRAZAN RED
 
         new Paragraph({
           children: [new TextRun({ text: `Iduće kolo (${round + 1}. kolo)`, bold: true })],
         }),
-        nextRoundTable,
+        nextTable,
       ],
     };
   });
