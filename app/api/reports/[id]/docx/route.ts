@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { createClient } from "@supabase/supabase-js";
 import {
   Document,
@@ -75,9 +78,6 @@ export async function GET(
 
   const { data: standings } = await supabase.from("standings").select("*");
 
-  // -------------------------------------------------------
-  // TABLE helper
-  // -------------------------------------------------------
   const table = (
     rows: string[][],
     header = false,
@@ -235,14 +235,14 @@ export async function GET(
   const doc = new Document({ sections });
   const buffer = await Packer.toBuffer(doc);
 
-  // ✅ ISPRAVAN, TS-SAFE DOCX DOWNLOAD
   return new Response(new Uint8Array(buffer), {
     headers: {
-      "Content-Type":
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "Content-Type": "application/octet-stream",
       "Content-Disposition":
-        `attachment; filename="izvjestaj_kolo_${round}.docx"`,
+        `attachment; filename="izvjestaj_kolo_${round}.docx"; filename*=UTF-8''izvjestaj_kolo_${round}.docx`,
       "Content-Length": buffer.byteLength.toString(),
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "no-store",
     },
   });
 }
