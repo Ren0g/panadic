@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
   Document,
@@ -31,7 +30,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const reportId = Number(params.id);
-  if (!reportId) return new NextResponse("Neispravan ID", { status: 400 });
+  if (!reportId) {
+    return new Response("Neispravan ID", { status: 400 });
+  }
 
   const { data: report } = await supabase
     .from("reports")
@@ -39,7 +40,10 @@ export async function GET(
     .eq("id", reportId)
     .single();
 
-  if (!report) return new NextResponse("Ne postoji izvještaj", { status: 404 });
+  if (!report) {
+    return new Response("Ne postoji izvještaj", { status: 404 });
+  }
+
   const round = report.round;
 
   const { data: teams } = await supabase.from("teams").select("id,name");
@@ -49,7 +53,9 @@ export async function GET(
   const { data: fixtures } = await supabase
     .from("fixtures")
     .select(`
-      league_code, home_team_id, away_team_id,
+      league_code,
+      home_team_id,
+      away_team_id,
       results:results!left ( home_goals, away_goals )
     `)
     .eq("round", round);
@@ -57,8 +63,11 @@ export async function GET(
   const { data: nextFixtures } = await supabase
     .from("fixtures")
     .select(`
-      league_code, match_date, match_time,
-      home_team_id, away_team_id
+      league_code,
+      match_date,
+      match_time,
+      home_team_id,
+      away_team_id
     `)
     .eq("round", round + 1)
     .order("match_date")
@@ -67,7 +76,7 @@ export async function GET(
   const { data: standings } = await supabase.from("standings").select("*");
 
   // -------------------------------------------------------
-  // TABLE helper – JEDINA promjena: equalCols
+  // TABLE helper
   // -------------------------------------------------------
   const table = (
     rows: string[][],
@@ -80,7 +89,6 @@ export async function GET(
         new TableRow({
           children: r.map((c, colIdx) =>
             new TableCell({
-              // Ako je kolona u equalCols -> forsiraj istu širinu
               width: equalCols.includes(colIdx)
                 ? { size: 6, type: WidthType.PERCENTAGE }
                 : undefined,
@@ -144,7 +152,6 @@ export async function GET(
           ]),
       ],
       true,
-      // Jednake širine samo za UT,P,N,I,G+,G-,GR,B (kolone 2..9)
       [2, 3, 4, 5, 6, 7, 8, 9]
     );
 
@@ -152,7 +159,9 @@ export async function GET(
       [
         ["Datum", "Vrijeme", "Domaćin", "Gost"],
         ...nx.map((f) => [
-          f.match_date ? new Date(f.match_date).toLocaleDateString("hr-HR") : "",
+          f.match_date
+            ? new Date(f.match_date).toLocaleDateString("hr-HR")
+            : "",
           f.match_time?.slice(0, 5) || "",
           teamName.get(f.home_team_id) || "",
           teamName.get(f.away_team_id) || "",
@@ -185,13 +194,17 @@ export async function GET(
         }),
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [new TextRun("malonogometne lige Panadić 2025/26")],
+          children: [
+            new TextRun("malonogometne lige Panadić 2025/26"),
+          ],
         }),
 
         new Paragraph({}),
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: lg.label, bold: true, size: 28 })],
+          children: [
+            new TextRun({ text: lg.label, bold: true, size: 28 }),
+          ],
         }),
 
         new Paragraph({
@@ -199,18 +212,19 @@ export async function GET(
         }),
         resultsTable,
 
-        new Paragraph({}), // PRAZAN RED
-
+        new Paragraph({}),
         new Paragraph({
           children: [new TextRun({ text: "Tablica", bold: true })],
         }),
         standingsTable,
 
-        new Paragraph({}), // PRAZAN RED
-
+        new Paragraph({}),
         new Paragraph({
           children: [
-            new TextRun({ text: `Iduće kolo (${round + 1}. kolo)`, bold: true }),
+            new TextRun({
+              text: `Iduće kolo (${round + 1}. kolo)`,
+              bold: true,
+            }),
           ],
         }),
         nextTable,
@@ -221,11 +235,14 @@ export async function GET(
   const doc = new Document({ sections });
   const buffer = await Packer.toBuffer(doc);
 
-  return new NextResponse(new Uint8Array(buffer), {
+  // ✅ ISPRAVAN DOCX DOWNLOAD (KLJUČNA PROMJENA)
+  return new Response(buffer, {
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "Content-Disposition": `attachment; filename="izvjestaj_kolo_${round}.docx"`,
+      "Content-Disposition":
+        `attachment; filename="izvjestaj_kolo_${round}.docx"`,
+      "Content-Length": buffer.byteLength.toString(),
     },
   });
 }
