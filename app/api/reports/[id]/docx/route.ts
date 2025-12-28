@@ -235,8 +235,8 @@ export async function GET(
   const doc = new Document({ sections });
   const buffer = await Packer.toBuffer(doc);
 
-  // ✅ ISPRAVAN DOCX DOWNLOAD (KLJUČNA PROMJENA)
-  return new Response(buffer, {
+  // ✅ ISPRAVAN, TS-SAFE DOCX DOWNLOAD
+  return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
