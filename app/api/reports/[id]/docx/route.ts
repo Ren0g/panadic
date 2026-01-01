@@ -42,7 +42,7 @@ const cellText = (text: string, bold = false) =>
         text,
         bold,
         size: 24, // 12pt
-        font: "Arial",
+        font: "Calibri",
       }),
     ],
   });
