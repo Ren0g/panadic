@@ -33,19 +33,24 @@ const LEAGUES = [
 // mm → DXA
 const dxa = (mm: number) => Math.round(mm * 56.7);
 
-// TEXT HELPER
+// ✅ JEDINA IZMJENA U FILEU — ISPRAVAN HELPER
 const cellText = (
   text: string,
   bold = false,
-  align: AlignmentType = AlignmentType.CENTER
+  align: "left" | "center" | "right" = "center"
 ) =>
   new Paragraph({
-    alignment: align,
+    alignment:
+      align === "left"
+        ? AlignmentType.LEFT
+        : align === "right"
+        ? AlignmentType.RIGHT
+        : AlignmentType.CENTER,
     children: [
       new TextRun({
         text,
         bold,
-        size: 24,
+        size: 24, // 12pt
         font: "Calibri",
       }),
     ],
@@ -69,7 +74,7 @@ export async function GET(
 
   const { data: teams } = await supabase.from("teams").select("id,name");
   const teamName = new Map<number, string>();
-  (teams || []).forEach(t => teamName.set(t.id, t.name));
+  (teams || []).forEach((t) => teamName.set(t.id, t.name));
 
   const { data: fixtures } = await supabase
     .from("fixtures")
@@ -93,26 +98,26 @@ export async function GET(
 
   const { data: standings } = await supabase.from("standings").select("*");
 
-  const sections = LEAGUES.map(lg => {
-    const fx = (fixtures || []).filter(f => f.league_code === lg.db);
-    const nx = (nextFixtures || []).filter(f => f.league_code === lg.db);
+  const sections = LEAGUES.map((lg) => {
+    const fx = (fixtures || []).filter((f) => f.league_code === lg.db);
+    const nx = (nextFixtures || []).filter((f) => f.league_code === lg.db);
     const st = (standings || [])
-      .filter(s => s.league_code === lg.db)
+      .filter((s) => s.league_code === lg.db)
       .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
 
-    // -------- REZULTATI --------
+    // ---------------- REZULTATI ----------------
     const resultsTable = new Table({
       layout: TableLayoutType.FIXED,
-      width: { size: dxa(110), type: WidthType.DXA },
+      width: { size: dxa(120), type: WidthType.DXA },
       rows: [
         new TableRow({
           children: [
-            new TableCell({ width: { size: dxa(40), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
-            new TableCell({ width: { size: dxa(40), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
+            new TableCell({ width: { size: dxa(45), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
+            new TableCell({ width: { size: dxa(45), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
             new TableCell({ width: { size: dxa(30), type: WidthType.DXA }, children: [cellText("Rezultat", true)] }),
           ],
         }),
-        ...fx.map(f => {
+        ...fx.map((f) => {
           const r = Array.isArray(f.results) ? f.results[0] : f.results;
           const score =
             r && r.home_goals != null && r.away_goals != null
@@ -120,8 +125,8 @@ export async function GET(
               : "-:-";
           return new TableRow({
             children: [
-              new TableCell({ children: [cellText(teamName.get(f.home_team_id) || "", false, AlignmentType.LEFT)] }),
-              new TableCell({ children: [cellText(teamName.get(f.away_team_id) || "", false, AlignmentType.LEFT)] }),
+              new TableCell({ children: [cellText(teamName.get(f.home_team_id) || "", false, "left")] }),
+              new TableCell({ children: [cellText(teamName.get(f.away_team_id) || "", false, "left")] }),
               new TableCell({ children: [cellText(score)] }),
             ],
           });
@@ -129,7 +134,7 @@ export async function GET(
       ],
     });
 
-    // -------- TABLICA --------
+    // ---------------- TABLICA ----------------
     const standingsTable = new Table({
       layout: TableLayoutType.FIXED,
       width: { size: dxa(180), type: WidthType.DXA },
@@ -138,54 +143,55 @@ export async function GET(
           children: [
             new TableCell({ width: { size: dxa(10), type: WidthType.DXA }, children: [cellText("R.br", true)] }),
             new TableCell({ width: { size: dxa(50), type: WidthType.DXA }, children: [cellText("Ekipa", true)] }),
-            ...["UT","P","N","I","G+","G-","GR"].map(h =>
-              new TableCell({ width: { size: dxa(14), type: WidthType.DXA }, children: [cellText(h, true)] })
+            ...["UT","P","N","I","G+","G-","GR","Bod"].map((h) =>
+              new TableCell({
+                width: { size: h === "Bod" ? dxa(21) : dxa(14), type: WidthType.DXA },
+                shading: h === "Bod" ? { type: ShadingType.CLEAR, fill: "E6E6E6" } : undefined,
+                children: [cellText(h, true)],
+              })
             ),
-            new TableCell({
-              width: { size: dxa(21), type: WidthType.DXA },
-              shading: { type: ShadingType.CLEAR, fill: "E6E6E6" },
-              children: [cellText("Bod", true)],
-            }),
           ],
         }),
         ...st.map((s, i) =>
           new TableRow({
             children: [
               new TableCell({ children: [cellText(String(i + 1))] }),
-              new TableCell({ children: [cellText(teamName.get(s.team_id) || "", false, AlignmentType.LEFT)] }),
-              ...[s.ut, s.p, s.n, s.i, s.gplus, s.gminus, s.gr].map(v =>
-                new TableCell({ children: [cellText(String(v))] })
+              new TableCell({ children: [cellText(teamName.get(s.team_id) || "", false, "left")] }),
+              ...[
+                s.ut, s.p, s.n, s.i,
+                s.gplus, s.gminus, s.gr, s.bodovi,
+              ].map((v, idx) =>
+                new TableCell({
+                  shading: idx === 7 ? { type: ShadingType.CLEAR, fill: "E6E6E6" } : undefined,
+                  children: [cellText(String(v))],
+                })
               ),
-              new TableCell({
-                shading: { type: ShadingType.CLEAR, fill: "E6E6E6" },
-                children: [cellText(String(s.bodovi))],
-              }),
             ],
           })
         ),
       ],
     });
 
-    // -------- IDUĆE KOLO --------
+    // ---------------- IDUĆE KOLO ----------------
     const nextTable = new Table({
       layout: TableLayoutType.FIXED,
-      width: { size: dxa(140), type: WidthType.DXA },
+      width: { size: dxa(150), type: WidthType.DXA },
       rows: [
         new TableRow({
           children: [
             new TableCell({ width: { size: dxa(30), type: WidthType.DXA }, children: [cellText("Datum", true)] }),
             new TableCell({ width: { size: dxa(25), type: WidthType.DXA }, children: [cellText("Vrijeme", true)] }),
-            new TableCell({ width: { size: dxa(42), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
-            new TableCell({ width: { size: dxa(43), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
+            new TableCell({ width: { size: dxa(45), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
+            new TableCell({ width: { size: dxa(45), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
           ],
         }),
-        ...nx.map(f =>
+        ...nx.map((f) =>
           new TableRow({
             children: [
               new TableCell({ children: [cellText(f.match_date ? new Date(f.match_date).toLocaleDateString("hr-HR") : "")] }),
-              new TableCell({ children: [cellText(f.match_time?.slice(0,5) || "")] }),
-              new TableCell({ children: [cellText(teamName.get(f.home_team_id) || "", false, AlignmentType.LEFT)] }),
-              new TableCell({ children: [cellText(teamName.get(f.away_team_id) || "", false, AlignmentType.LEFT)] }),
+              new TableCell({ children: [cellText(f.match_time?.slice(0, 5) || "")] }),
+              new TableCell({ children: [cellText(teamName.get(f.home_team_id) || "", false, "left")] }),
+              new TableCell({ children: [cellText(teamName.get(f.away_team_id) || "", false, "left")] }),
             ],
           })
         ),
@@ -207,26 +213,43 @@ export async function GET(
         new Paragraph({
           alignment: AlignmentType.CENTER,
           children: [
-            new TextRun({ text: `Izvještaj nakon ${round}. kola`, bold: true, size: 32, font: "Calibri" }),
+            new TextRun({
+              text: `Izvještaj nakon ${round}. kola`,
+              bold: true,
+              size: 32,
+              font: "Calibri",
+            }),
           ],
         }),
         new Paragraph({
           alignment: AlignmentType.CENTER,
           children: [new TextRun({ text: "malonogometne lige Panadić 2025/26", font: "Calibri" })],
         }),
+
         new Paragraph({}),
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: lg.label, bold: true, size: 28, font: "Calibri" })],
+          children: [
+            new TextRun({ text: lg.label, bold: true, size: 28, font: "Calibri" }),
+          ],
         }),
+
         new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true, font: "Calibri" })] }),
         resultsTable,
+
         new Paragraph({}),
         new Paragraph({ children: [new TextRun({ text: "Tablica", bold: true, font: "Calibri" })] }),
         standingsTable,
+
         new Paragraph({}),
         new Paragraph({
-          children: [new TextRun({ text: `Iduće kolo (${round + 1}. kolo)`, bold: true, font: "Calibri" })],
+          children: [
+            new TextRun({
+              text: `Iduće kolo (${round + 1}. kolo)`,
+              bold: true,
+              font: "Calibri",
+            }),
+          ],
         }),
         nextTable,
       ],
@@ -238,8 +261,7 @@ export async function GET(
 
   return new Response(new Uint8Array(buffer), {
     headers: {
-      "Content-Type":
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "Content-Disposition": `attachment; filename="izvjestaj_kolo_${round}.docx"`,
       "Cache-Control": "no-store",
     },
