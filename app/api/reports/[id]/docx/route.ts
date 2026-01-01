@@ -30,10 +30,10 @@ const LEAGUES = [
   { db: "POC_REG_B", label: "Početnici B" },
 ];
 
-// DXA helpers
+// mm → DXA
 const dxa = (mm: number) => Math.round(mm * 56.7);
 
-// common text
+// CENTRALNI TEXT HELPER — CALIBRI 12
 const cellText = (text: string, bold = false) =>
   new Paragraph({
     alignment: AlignmentType.CENTER,
@@ -96,7 +96,7 @@ export async function GET(
       .filter(s => s.league_code === lg.db)
       .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
 
-    // ---------------- RESULTS TABLE (UŽA) ----------------
+    // ---------------- REZULTATI (UŽA TABLICA) ----------------
     const resultsTable = new Table({
       layout: TableLayoutType.FIXED,
       width: { size: dxa(120), type: WidthType.DXA },
@@ -125,7 +125,7 @@ export async function GET(
       ],
     });
 
-    // ---------------- STANDINGS TABLE (NAJŠIRA) ----------------
+    // ---------------- TABLICA (NAJŠIRA, B ZASIVLJEN) ----------------
     const standingsTable = new Table({
       layout: TableLayoutType.FIXED,
       width: { size: dxa(180), type: WidthType.DXA },
@@ -163,7 +163,7 @@ export async function GET(
       ],
     });
 
-    // ---------------- NEXT ROUND TABLE (SREDNJA) ----------------
+    // ---------------- IDUĆE KOLO (SREDNJA ŠIRINA) ----------------
     const nextTable = new Table({
       layout: TableLayoutType.FIXED,
       width: { size: dxa(150), type: WidthType.DXA },
@@ -192,24 +192,56 @@ export async function GET(
     return {
       footers: {
         default: new Footer({
-          children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun("panadic.vercel.app")] })],
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [new TextRun({ text: "panadic.vercel.app", font: "Calibri" })],
+            }),
+          ],
         }),
       },
       children: [
-        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Izvještaj nakon ${round}. kola`, bold: true, size: 32 })] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun("malonogometne lige Panadić 2025/26")] }),
-        new Paragraph({}),
-        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: lg.label, bold: true, size: 28 })] }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [
+            new TextRun({
+              text: `Izvještaj nakon ${round}. kola`,
+              bold: true,
+              size: 32,
+              font: "Calibri",
+            }),
+          ],
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [new TextRun({ text: "malonogometne lige Panadić 2025/26", font: "Calibri" })],
+        }),
 
-        new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true })] }),
+        new Paragraph({}),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [
+            new TextRun({ text: lg.label, bold: true, size: 28, font: "Calibri" }),
+          ],
+        }),
+
+        new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true, font: "Calibri" })] }),
         resultsTable,
 
         new Paragraph({}),
-        new Paragraph({ children: [new TextRun({ text: "Tablica", bold: true })] }),
+        new Paragraph({ children: [new TextRun({ text: "Tablica", bold: true, font: "Calibri" })] }),
         standingsTable,
 
         new Paragraph({}),
-        new Paragraph({ children: [new TextRun({ text: `Iduće kolo (${round + 1}. kolo)`, bold: true })] }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Iduće kolo (${round + 1}. kolo)`,
+              bold: true,
+              font: "Calibri",
+            }),
+          ],
+        }),
         nextTable,
       ],
     };
