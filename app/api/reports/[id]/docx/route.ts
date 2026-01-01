@@ -30,10 +30,9 @@ const LEAGUES = [
   { db: "POC_REG_B", label: "Početnici B" },
 ];
 
-// mm → DXA
 const dxa = (mm: number) => Math.round(mm * 56.7);
 
-// helper
+// SVI FONTOVI — CALIBRI 12
 const cellText = (
   text: string,
   bold = false,
@@ -101,16 +100,16 @@ export async function GET(
       .filter(s => s.league_code === lg.db)
       .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
 
-    // REZULTATI (još uži klubovi)
+    // REZULTATI — KLUBOVI -20%
     const resultsTable = new Table({
       layout: TableLayoutType.FIXED,
-      width: { size: dxa(110), type: WidthType.DXA },
+      width: { size: dxa(100), type: WidthType.DXA },
       rows: [
         new TableRow({
           children: [
-            new TableCell({ width: { size: dxa(40), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
-            new TableCell({ width: { size: dxa(40), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
-            new TableCell({ width: { size: dxa(30), type: WidthType.DXA }, children: [cellText("Rezultat", true)] }),
+            new TableCell({ width: { size: dxa(32), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
+            new TableCell({ width: { size: dxa(32), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
+            new TableCell({ width: { size: dxa(36), type: WidthType.DXA }, children: [cellText("Rezultat", true)] }),
           ],
         }),
         ...fx.map(f => {
@@ -133,15 +132,15 @@ export async function GET(
     // TABLICA
     const standingsTable = new Table({
       layout: TableLayoutType.FIXED,
-      width: { size: dxa(170), type: WidthType.DXA },
+      width: { size: dxa(165), type: WidthType.DXA },
       rows: [
         new TableRow({
           children: [
-            new TableCell({ width: { size: dxa(9), type: WidthType.DXA }, children: [cellText("R.br", true)] }),
-            new TableCell({ width: { size: dxa(45), type: WidthType.DXA }, children: [cellText("Ekipa", true)] }),
+            new TableCell({ width: { size: dxa(8), type: WidthType.DXA }, children: [cellText("R.br", true)] }),
+            new TableCell({ width: { size: dxa(36), type: WidthType.DXA }, children: [cellText("Ekipa", true)] }),
             ...["UT","P","N","I","G+","G-","GR","Bod"].map(h =>
               new TableCell({
-                width: { size: h === "Bod" ? dxa(18) : dxa(11), type: WidthType.DXA },
+                width: { size: h === "Bod" ? dxa(16) : dxa(10), type: WidthType.DXA },
                 shading: h === "Bod" ? { type: ShadingType.CLEAR, fill: "E6E6E6" } : undefined,
                 children: [cellText(h, true)],
               })
@@ -168,17 +167,17 @@ export async function GET(
       ],
     });
 
-    // IDUĆE KOLO
+    // IDUĆE KOLO — KLUBOVI -20%
     const nextTable = new Table({
       layout: TableLayoutType.FIXED,
-      width: { size: dxa(140), type: WidthType.DXA },
+      width: { size: dxa(135), type: WidthType.DXA },
       rows: [
         new TableRow({
           children: [
-            new TableCell({ width: { size: dxa(28), type: WidthType.DXA }, children: [cellText("Datum", true)] }),
+            new TableCell({ width: { size: dxa(26), type: WidthType.DXA }, children: [cellText("Datum", true)] }),
             new TableCell({ width: { size: dxa(22), type: WidthType.DXA }, children: [cellText("Vrijeme", true)] }),
-            new TableCell({ width: { size: dxa(45), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
-            new TableCell({ width: { size: dxa(45), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
+            new TableCell({ width: { size: dxa(43), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
+            new TableCell({ width: { size: dxa(44), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
           ],
         }),
         ...nx.map(f =>
@@ -200,7 +199,7 @@ export async function GET(
           children: [
             new Paragraph({
               alignment: AlignmentType.CENTER,
-              children: [new TextRun({ text: "panadic.vercel.app", font: "Calibri" })],
+              children: [new TextRun({ text: "panadic.vercel.app", font: "Calibri", size: 24 })],
             }),
           ],
         }),
@@ -208,36 +207,32 @@ export async function GET(
       children: [
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [
-            new TextRun({ text: `${round}. kolo`, bold: true, size: 32, font: "Calibri" }),
-          ],
+          children: [new TextRun({ text: `${round}. kolo`, bold: true, size: 24, font: "Calibri" })],
         }),
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [
-            new TextRun({ text: "Malonogometna liga Panadić 2025/26", size: 28, font: "Calibri" }),
-          ],
+          children: [new TextRun({ text: "Malonogometna liga Panadić 2025/26", size: 24, font: "Calibri" })],
         }),
 
         new Paragraph({}),
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: lg.label, bold: true, size: 28, font: "Calibri" })],
+          children: [new TextRun({ text: lg.label, bold: true, size: 24, font: "Calibri" })],
         }),
 
-        new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true, font: "Calibri" })] }),
+        new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true, font: "Calibri", size: 24 })] }),
         resultsTable,
 
         new Paragraph({}),
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: "Tablica", bold: true, font: "Calibri" })],
+          children: [new TextRun({ text: "Tablica", bold: true, font: "Calibri", size: 24 })],
         }),
         standingsTable,
 
         new Paragraph({}),
         new Paragraph({
-          children: [new TextRun({ text: `${round + 1}. kolo`, bold: true, font: "Calibri" })],
+          children: [new TextRun({ text: `${round + 1}. kolo`, bold: true, font: "Calibri", size: 24 })],
         }),
         nextTable,
       ],
