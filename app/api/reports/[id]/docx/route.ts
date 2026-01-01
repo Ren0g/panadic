@@ -80,8 +80,7 @@ export async function GET(
 
   const table = (
     rows: string[][],
-    header = false,
-    equalCols: number[] = []
+    header = false
   ) =>
     new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
@@ -89,9 +88,12 @@ export async function GET(
         new TableRow({
           children: r.map((c, colIdx) =>
             new TableCell({
-              width: equalCols.includes(colIdx)
-                ? { size: 6, type: WidthType.PERCENTAGE }
-                : undefined,
+              width:
+                colIdx === 0
+                  ? { size: 5, type: WidthType.PERCENTAGE }   // R.br
+                  : colIdx === 1
+                  ? { size: 25, type: WidthType.PERCENTAGE }  // Ekipa
+                  : { size: 7, type: WidthType.PERCENTAGE },  // UT, P, N, I, G+, G-, GR, B
               children: [
                 new Paragraph({
                   alignment: AlignmentType.CENTER,
@@ -151,8 +153,7 @@ export async function GET(
             String(s.bodovi),
           ]),
       ],
-      true,
-      [2, 3, 4, 5, 6, 7, 8, 9]
+      true
     );
 
     const nextTable = table(
@@ -207,15 +208,11 @@ export async function GET(
           ],
         }),
 
-        new Paragraph({
-          children: [new TextRun({ text: "Rezultati", bold: true })],
-        }),
+        new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true })] }),
         resultsTable,
 
         new Paragraph({}),
-        new Paragraph({
-          children: [new TextRun({ text: "Tablica", bold: true })],
-        }),
+        new Paragraph({ children: [new TextRun({ text: "Tablica", bold: true })] }),
         standingsTable,
 
         new Paragraph({}),
