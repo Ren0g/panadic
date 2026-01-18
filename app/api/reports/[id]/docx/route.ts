@@ -23,13 +23,12 @@ const supabase = createClient(
 );
 
 /**
- * LIGE
- * ⬇️ DODANE ZLATNA I SREBRNA
+ * 🔴 OVDJE JE BILA GREŠKA – SAD SU DODANE ZLATNA I SREBRNA
  */
 const LEAGUES = [
-  { db: "PIONIRI_REG", label: "Pioniri" },
-  { db: "MLPIONIRI_REG", label: "Mlađi pioniri" },
   { db: "PRSTICI_REG", label: "Prstići" },
+  { db: "MLPIONIRI_REG", label: "Mlađi pioniri" },
+  { db: "PIONIRI_REG", label: "Pioniri" },
   { db: "POC_REG_A", label: "Početnici A" },
   { db: "POC_REG_B", label: "Početnici B" },
   { db: "POC_GOLD", label: "Zlatna liga" },
@@ -105,6 +104,9 @@ export async function GET(
     const st = (standings || [])
       .filter(s => s.league_code === lg.db)
       .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
+
+    // Ako liga nema ništa u tom kolu – preskoči
+    if (!fx.length && !st.length && !nx.length) return null;
 
     // -------- REZULTATI --------
     const resultsTable = new Table({
@@ -213,17 +215,17 @@ export async function GET(
       children: [
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: `${round}. kolo`, bold: true, size: 24, font: "Calibri" })],
+          children: [new TextRun({ text: `${round}. kolo`, bold: true, font: "Calibri", size: 24 })],
         }),
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: "Malonogometna liga Panadić 2025/26", size: 24, font: "Calibri" })],
+          children: [new TextRun({ text: "Malonogometna liga Panadić 2025/26", font: "Calibri", size: 24 })],
         }),
 
         new Paragraph({}),
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: lg.label, bold: true, size: 24, font: "Calibri" })],
+          children: [new TextRun({ text: lg.label, bold: true, font: "Calibri", size: 24 })],
         }),
 
         new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true, font: "Calibri", size: 24 })] }),
@@ -244,7 +246,7 @@ export async function GET(
         nextTable,
       ],
     };
-  });
+  }).filter(Boolean) as any[];
 
   const doc = new Document({ sections });
   const buffer = await Packer.toBuffer(doc);
