@@ -22,14 +22,21 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+/**
+ * LIGE
+ * ⬇️ DODANE ZLATNA I SREBRNA
+ */
 const LEAGUES = [
   { db: "PIONIRI_REG", label: "Pioniri" },
   { db: "MLPIONIRI_REG", label: "Mlađi pioniri" },
   { db: "PRSTICI_REG", label: "Prstići" },
   { db: "POC_REG_A", label: "Početnici A" },
   { db: "POC_REG_B", label: "Početnici B" },
+  { db: "POC_GOLD", label: "Zlatna liga" },
+  { db: "POC_SILVER", label: "Srebrna liga" },
 ];
 
+// mm → DXA
 const dxa = (mm: number) => Math.round(mm * 56.7);
 
 // CALIBRI 12 helper
@@ -44,7 +51,7 @@ const cellText = (
       new TextRun({
         text,
         bold,
-        size: 24,
+        size: 24, // 12pt
         font: "Calibri",
       }),
     ],
@@ -99,7 +106,7 @@ export async function GET(
       .filter(s => s.league_code === lg.db)
       .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
 
-    // -------- REZULTATI (Domaćin/Gost +10%) --------
+    // -------- REZULTATI --------
     const resultsTable = new Table({
       layout: TableLayoutType.FIXED,
       width: { size: dxa(100), type: WidthType.DXA },
@@ -128,7 +135,7 @@ export async function GET(
       ],
     });
 
-    // -------- TABLICA (Ekipa −15%) --------
+    // -------- TABLICA --------
     const standingsTable = new Table({
       layout: TableLayoutType.FIXED,
       width: { size: dxa(165), type: WidthType.DXA },
@@ -227,7 +234,7 @@ export async function GET(
           alignment: AlignmentType.CENTER,
           children: [new TextRun({ text: "Tablica", bold: true, font: "Calibri", size: 24 })],
         }),
-        new Paragraph({}), // RAZMAK IZMEĐU NASLOVA I TABLICE
+        new Paragraph({}),
         standingsTable,
 
         new Paragraph({}),
