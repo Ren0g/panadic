@@ -15,7 +15,6 @@ import {
   Footer,
   TableLayoutType,
   ShadingType,
-  type ISectionOptions,
 } from "docx";
 
 const supabase = createClient(
@@ -42,14 +41,7 @@ const cellText = (
 ) =>
   new Paragraph({
     alignment: align === "left" ? AlignmentType.LEFT : AlignmentType.CENTER,
-    children: [
-      new TextRun({
-        text,
-        bold,
-        size: 24,
-        font: "Calibri",
-      }),
-    ],
+    children: [new TextRun({ text, bold, size: 24, font: "Calibri" })],
   });
 
 export async function GET(
@@ -94,35 +86,33 @@ export async function GET(
 
   const { data: standings } = await supabase.from("standings").select("*");
 
-  const sections: ISectionOptions[] = LEAGUES.map(lg => {
+  const sections = LEAGUES.map(lg => {
     const fx = (fixtures || []).filter(f => f.league_code === lg.db);
     const nx = (nextFixtures || []).filter(f => f.league_code === lg.db);
     const st = (standings || [])
       .filter(s => s.league_code === lg.db)
       .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
 
-    // Liga mora postojati u drugom dijelu
+    // 🔴 Drugi dio natjecanja – liga postoji ako ima standings
     if (!st.length) return null;
 
-    const children: ISectionOptions["children"] = [
+    const children = [
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: `${round}. kolo`, bold: true, font: "Calibri", size: 24 })],
+        children: [new TextRun({ text: `${round}. kolo`, bold: true, size: 24, font: "Calibri" })],
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: "Malonogometna liga Panadić 2025/26", font: "Calibri", size: 24 })],
+        children: [new TextRun({ text: "Malonogometna liga Panadić 2025/26", size: 24, font: "Calibri" })],
       }),
       new Paragraph({}),
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: lg.label, bold: true, font: "Calibri", size: 24 })],
+        children: [new TextRun({ text: lg.label, bold: true, size: 24, font: "Calibri" })],
       }),
-    ];
 
-    if (fx.length) {
-      children.push(
-        new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true, font: "Calibri", size: 24 })] }),
+      ...(fx.length ? [
+        new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true, size: 24, font: "Calibri" })] }),
         new Table({
           layout: TableLayoutType.FIXED,
           width: { size: dxa(100), type: WidthType.DXA },
@@ -149,15 +139,13 @@ export async function GET(
               });
             }),
           ],
-        })
-      );
-    }
+        }),
+      ] : []),
 
-    children.push(
       new Paragraph({}),
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: "Tablica", bold: true, font: "Calibri", size: 24 })],
+        children: [new TextRun({ text: "Tablica", bold: true, size: 24, font: "Calibri" })],
       }),
       new Table({
         layout: TableLayoutType.FIXED,
@@ -180,22 +168,18 @@ export async function GET(
               children: [
                 new TableCell({ children: [cellText(String(i + 1))] }),
                 new TableCell({ children: [cellText(teamName.get(s.team_id) || "", false, "left")] }),
-                ...[
-                  s.ut, s.p, s.n, s.i,
-                  s.gplus, s.gminus, s.gr, s.bodovi,
-                ].map(v => new TableCell({ children: [cellText(String(v))] })),
+                ...[s.ut, s.p, s.n, s.i, s.gplus, s.gminus, s.gr, s.bodovi]
+                  .map(v => new TableCell({ children: [cellText(String(v))] })),
               ],
             })
           ),
         ],
-      })
-    );
+      }),
 
-    if (nx.length) {
-      children.push(
+      ...(nx.length ? [
         new Paragraph({}),
         new Paragraph({
-          children: [new TextRun({ text: `${round + 1}. kolo`, bold: true, font: "Calibri", size: 24 })],
+          children: [new TextRun({ text: `${round + 1}. kolo`, bold: true, size: 24, font: "Calibri" })],
         }),
         new Table({
           layout: TableLayoutType.FIXED,
@@ -220,9 +204,9 @@ export async function GET(
               })
             ),
           ],
-        })
-      );
-    }
+        }),
+      ] : []),
+    ];
 
     return {
       footers: {
@@ -237,7 +221,7 @@ export async function GET(
       },
       children,
     };
-  }).filter(Boolean) as ISectionOptions[];
+  }).filter(Boolean);
 
   const doc = new Document({ sections });
   const buffer = await Packer.toBuffer(doc);
