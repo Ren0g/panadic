@@ -41,7 +41,14 @@ const cellText = (
 ) =>
   new Paragraph({
     alignment: align === "left" ? AlignmentType.LEFT : AlignmentType.CENTER,
-    children: [new TextRun({ text, bold, size: 24, font: "Calibri" })],
+    children: [
+      new TextRun({
+        text,
+        bold,
+        size: 24,
+        font: "Calibri",
+      }),
+    ],
   });
 
 export async function GET(
@@ -64,6 +71,7 @@ export async function GET(
   const teamName = new Map<number, string>();
   (teams || []).forEach(t => teamName.set(t.id, t.name));
 
+  // 🔹 UTAKMICE TOČNO TOG KOLA
   const { data: fixtures } = await supabase
     .from("fixtures")
     .select(`
@@ -74,6 +82,7 @@ export async function GET(
     `)
     .eq("round", round);
 
+  // 🔹 IDUĆE KOLO (samo informativno)
   const { data: nextFixtures } = await supabase
     .from("fixtures")
     .select(`
@@ -84,17 +93,21 @@ export async function GET(
     .order("match_date")
     .order("match_time");
 
-  const { data: standings } = await supabase.from("standings").select("*");
+  const { data: standings } = await supabase
+    .from("standings")
+    .select("*");
 
   const sections = LEAGUES.map(lg => {
     const fx = (fixtures || []).filter(f => f.league_code === lg.db);
+
+    // 🔴 KLJUČNO PRAVILO:
+    // LIGA SE PRIKAZUJE SAMO AKO JE IGRALA U OVOM KOLU
+    if (!fx.length) return null;
+
     const nx = (nextFixtures || []).filter(f => f.league_code === lg.db);
     const st = (standings || [])
       .filter(s => s.league_code === lg.db)
       .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
-
-    // 🔴 Drugi dio natjecanja – liga postoji ako ima standings
-    if (!st.length) return null;
 
     const children = [
       new Paragraph({
@@ -111,37 +124,37 @@ export async function GET(
         children: [new TextRun({ text: lg.label, bold: true, size: 24, font: "Calibri" })],
       }),
 
-      ...(fx.length ? [
-        new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true, size: 24, font: "Calibri" })] }),
-        new Table({
-          layout: TableLayoutType.FIXED,
-          width: { size: dxa(100), type: WidthType.DXA },
-          rows: [
-            new TableRow({
+      // -------- REZULTATI --------
+      new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true, size: 24, font: "Calibri" })] }),
+      new Table({
+        layout: TableLayoutType.FIXED,
+        width: { size: dxa(100), type: WidthType.DXA },
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({ children: [cellText("Domaćin", true)] }),
+              new TableCell({ children: [cellText("Gost", true)] }),
+              new TableCell({ children: [cellText("Rezultat", true)] }),
+            ],
+          }),
+          ...fx.map(f => {
+            const r = Array.isArray(f.results) ? f.results[0] : f.results;
+            const score =
+              r && r.home_goals != null && r.away_goals != null
+                ? `${r.home_goals}:${r.away_goals}`
+                : "-:-";
+            return new TableRow({
               children: [
-                new TableCell({ children: [cellText("Domaćin", true)] }),
-                new TableCell({ children: [cellText("Gost", true)] }),
-                new TableCell({ children: [cellText("Rezultat", true)] }),
+                new TableCell({ children: [cellText(teamName.get(f.home_team_id) || "", false, "left")] }),
+                new TableCell({ children: [cellText(teamName.get(f.away_team_id) || "", false, "left")] }),
+                new TableCell({ children: [cellText(score)] }),
               ],
-            }),
-            ...fx.map(f => {
-              const r = Array.isArray(f.results) ? f.results[0] : f.results;
-              const score =
-                r && r.home_goals != null && r.away_goals != null
-                  ? `${r.home_goals}:${r.away_goals}`
-                  : "-:-";
-              return new TableRow({
-                children: [
-                  new TableCell({ children: [cellText(teamName.get(f.home_team_id) || "", false, "left")] }),
-                  new TableCell({ children: [cellText(teamName.get(f.away_team_id) || "", false, "left")] }),
-                  new TableCell({ children: [cellText(score)] }),
-                ],
-              });
-            }),
-          ],
-        }),
-      ] : []),
+            });
+          }),
+        ],
+      }),
 
+      // -------- TABLICA --------
       new Paragraph({}),
       new Paragraph({
         alignment: AlignmentType.CENTER,
@@ -176,6 +189,7 @@ export async function GET(
         ],
       }),
 
+      // -------- IDUĆE KOLO (AKO POSTOJI) --------
       ...(nx.length ? [
         new Paragraph({}),
         new Paragraph({
