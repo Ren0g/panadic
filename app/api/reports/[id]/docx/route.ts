@@ -15,6 +15,7 @@ import {
   Footer,
   TableLayoutType,
   ShadingType,
+  type ISectionOptions,
 } from "docx";
 
 const supabase = createClient(
@@ -93,17 +94,17 @@ export async function GET(
 
   const { data: standings } = await supabase.from("standings").select("*");
 
-  const sections = LEAGUES.map(lg => {
+  const sections: ISectionOptions[] = LEAGUES.map(lg => {
     const fx = (fixtures || []).filter(f => f.league_code === lg.db);
     const nx = (nextFixtures || []).filter(f => f.league_code === lg.db);
     const st = (standings || [])
       .filter(s => s.league_code === lg.db)
       .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
 
-    // 🔴 KLJUČNO: liga se prikazuje AKO IMA STANDINGS
+    // Liga mora postojati u drugom dijelu
     if (!st.length) return null;
 
-    const children: Paragraph[] | any[] = [
+    const children: ISectionOptions["children"] = [
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [new TextRun({ text: `${round}. kolo`, bold: true, font: "Calibri", size: 24 })],
@@ -119,7 +120,6 @@ export async function GET(
       }),
     ];
 
-    // -------- REZULTATI (samo ako postoje) --------
     if (fx.length) {
       children.push(
         new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true, font: "Calibri", size: 24 })] }),
@@ -129,9 +129,9 @@ export async function GET(
           rows: [
             new TableRow({
               children: [
-                new TableCell({ width: { size: dxa(35), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
-                new TableCell({ width: { size: dxa(35), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
-                new TableCell({ width: { size: dxa(30), type: WidthType.DXA }, children: [cellText("Rezultat", true)] }),
+                new TableCell({ children: [cellText("Domaćin", true)] }),
+                new TableCell({ children: [cellText("Gost", true)] }),
+                new TableCell({ children: [cellText("Rezultat", true)] }),
               ],
             }),
             ...fx.map(f => {
@@ -153,7 +153,6 @@ export async function GET(
       );
     }
 
-    // -------- TABLICA (uvijek postoji) --------
     children.push(
       new Paragraph({}),
       new Paragraph({
@@ -166,11 +165,10 @@ export async function GET(
         rows: [
           new TableRow({
             children: [
-              new TableCell({ width: { size: dxa(8), type: WidthType.DXA }, children: [cellText("R.br", true)] }),
-              new TableCell({ width: { size: dxa(30), type: WidthType.DXA }, children: [cellText("Ekipa", true)] }),
+              new TableCell({ children: [cellText("R.br", true)] }),
+              new TableCell({ children: [cellText("Ekipa", true)] }),
               ...["UT","P","N","I","G+","G-","GR","Bod"].map(h =>
                 new TableCell({
-                  width: { size: h === "Bod" ? dxa(16) : dxa(10), type: WidthType.DXA },
                   shading: h === "Bod" ? { type: ShadingType.CLEAR, fill: "E6E6E6" } : undefined,
                   children: [cellText(h, true)],
                 })
@@ -185,12 +183,7 @@ export async function GET(
                 ...[
                   s.ut, s.p, s.n, s.i,
                   s.gplus, s.gminus, s.gr, s.bodovi,
-                ].map((v, idx) =>
-                  new TableCell({
-                    shading: idx === 7 ? { type: ShadingType.CLEAR, fill: "E6E6E6" } : undefined,
-                    children: [cellText(String(v))],
-                  })
-                ),
+                ].map(v => new TableCell({ children: [cellText(String(v))] })),
               ],
             })
           ),
@@ -198,7 +191,6 @@ export async function GET(
       })
     );
 
-    // -------- IDUĆE KOLO (samo ako postoji) --------
     if (nx.length) {
       children.push(
         new Paragraph({}),
@@ -211,10 +203,10 @@ export async function GET(
           rows: [
             new TableRow({
               children: [
-                new TableCell({ width: { size: dxa(26), type: WidthType.DXA }, children: [cellText("Datum", true)] }),
-                new TableCell({ width: { size: dxa(22), type: WidthType.DXA }, children: [cellText("Vrijeme", true)] }),
-                new TableCell({ width: { size: dxa(43), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
-                new TableCell({ width: { size: dxa(44), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
+                new TableCell({ children: [cellText("Datum", true)] }),
+                new TableCell({ children: [cellText("Vrijeme", true)] }),
+                new TableCell({ children: [cellText("Domaćin", true)] }),
+                new TableCell({ children: [cellText("Gost", true)] }),
               ],
             }),
             ...nx.map(f =>
@@ -245,7 +237,7 @@ export async function GET(
       },
       children,
     };
-  }).filter(Boolean) as any[];
+  }).filter(Boolean) as ISectionOptions[];
 
   const doc = new Document({ sections });
   const buffer = await Packer.toBuffer(doc);
