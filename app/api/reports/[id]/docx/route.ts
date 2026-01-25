@@ -22,9 +22,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-/**
- * 🔴 OVDJE JE BILA GREŠKA – SAD SU DODANE ZLATNA I SREBRNA
- */
 const LEAGUES = [
   { db: "PRSTICI_REG", label: "Prstići" },
   { db: "MLPIONIRI_REG", label: "Mlađi pioniri" },
@@ -35,10 +32,8 @@ const LEAGUES = [
   { db: "POC_SILVER", label: "Srebrna liga" },
 ];
 
-// mm → DXA
 const dxa = (mm: number) => Math.round(mm * 56.7);
 
-// CALIBRI 12 helper
 const cellText = (
   text: string,
   bold = false,
@@ -50,7 +45,7 @@ const cellText = (
       new TextRun({
         text,
         bold,
-        size: 24, // 12pt
+        size: 24,
         font: "Calibri",
       }),
     ],
@@ -105,101 +100,137 @@ export async function GET(
       .filter(s => s.league_code === lg.db)
       .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
 
-    // Ako liga nema ništa u tom kolu – preskoči
-    if (!fx.length && !st.length && !nx.length) return null;
+    // 🔴 KLJUČNO: liga se prikazuje AKO IMA STANDINGS
+    if (!st.length) return null;
 
-    // -------- REZULTATI --------
-    const resultsTable = new Table({
-      layout: TableLayoutType.FIXED,
-      width: { size: dxa(100), type: WidthType.DXA },
-      rows: [
-        new TableRow({
-          children: [
-            new TableCell({ width: { size: dxa(35), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
-            new TableCell({ width: { size: dxa(35), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
-            new TableCell({ width: { size: dxa(30), type: WidthType.DXA }, children: [cellText("Rezultat", true)] }),
-          ],
-        }),
-        ...fx.map(f => {
-          const r = Array.isArray(f.results) ? f.results[0] : f.results;
-          const score =
-            r && r.home_goals != null && r.away_goals != null
-              ? `${r.home_goals}:${r.away_goals}`
-              : "-:-";
-          return new TableRow({
-            children: [
-              new TableCell({ children: [cellText(teamName.get(f.home_team_id) || "", false, "left")] }),
-              new TableCell({ children: [cellText(teamName.get(f.away_team_id) || "", false, "left")] }),
-              new TableCell({ children: [cellText(score)] }),
-            ],
-          });
-        }),
-      ],
-    });
+    const children: Paragraph[] | any[] = [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: `${round}. kolo`, bold: true, font: "Calibri", size: 24 })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: "Malonogometna liga Panadić 2025/26", font: "Calibri", size: 24 })],
+      }),
+      new Paragraph({}),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: lg.label, bold: true, font: "Calibri", size: 24 })],
+      }),
+    ];
 
-    // -------- TABLICA --------
-    const standingsTable = new Table({
-      layout: TableLayoutType.FIXED,
-      width: { size: dxa(165), type: WidthType.DXA },
-      rows: [
-        new TableRow({
-          children: [
-            new TableCell({ width: { size: dxa(8), type: WidthType.DXA }, children: [cellText("R.br", true)] }),
-            new TableCell({ width: { size: dxa(30), type: WidthType.DXA }, children: [cellText("Ekipa", true)] }),
-            ...["UT","P","N","I","G+","G-","GR","Bod"].map(h =>
-              new TableCell({
-                width: { size: h === "Bod" ? dxa(16) : dxa(10), type: WidthType.DXA },
-                shading: h === "Bod" ? { type: ShadingType.CLEAR, fill: "E6E6E6" } : undefined,
-                children: [cellText(h, true)],
-              })
-            ),
+    // -------- REZULTATI (samo ako postoje) --------
+    if (fx.length) {
+      children.push(
+        new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true, font: "Calibri", size: 24 })] }),
+        new Table({
+          layout: TableLayoutType.FIXED,
+          width: { size: dxa(100), type: WidthType.DXA },
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({ width: { size: dxa(35), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
+                new TableCell({ width: { size: dxa(35), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
+                new TableCell({ width: { size: dxa(30), type: WidthType.DXA }, children: [cellText("Rezultat", true)] }),
+              ],
+            }),
+            ...fx.map(f => {
+              const r = Array.isArray(f.results) ? f.results[0] : f.results;
+              const score =
+                r && r.home_goals != null && r.away_goals != null
+                  ? `${r.home_goals}:${r.away_goals}`
+                  : "-:-";
+              return new TableRow({
+                children: [
+                  new TableCell({ children: [cellText(teamName.get(f.home_team_id) || "", false, "left")] }),
+                  new TableCell({ children: [cellText(teamName.get(f.away_team_id) || "", false, "left")] }),
+                  new TableCell({ children: [cellText(score)] }),
+                ],
+              });
+            }),
           ],
-        }),
-        ...st.map((s, i) =>
+        })
+      );
+    }
+
+    // -------- TABLICA (uvijek postoji) --------
+    children.push(
+      new Paragraph({}),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: "Tablica", bold: true, font: "Calibri", size: 24 })],
+      }),
+      new Table({
+        layout: TableLayoutType.FIXED,
+        width: { size: dxa(165), type: WidthType.DXA },
+        rows: [
           new TableRow({
             children: [
-              new TableCell({ children: [cellText(String(i + 1))] }),
-              new TableCell({ children: [cellText(teamName.get(s.team_id) || "", false, "left")] }),
-              ...[
-                s.ut, s.p, s.n, s.i,
-                s.gplus, s.gminus, s.gr, s.bodovi,
-              ].map((v, idx) =>
+              new TableCell({ width: { size: dxa(8), type: WidthType.DXA }, children: [cellText("R.br", true)] }),
+              new TableCell({ width: { size: dxa(30), type: WidthType.DXA }, children: [cellText("Ekipa", true)] }),
+              ...["UT","P","N","I","G+","G-","GR","Bod"].map(h =>
                 new TableCell({
-                  shading: idx === 7 ? { type: ShadingType.CLEAR, fill: "E6E6E6" } : undefined,
-                  children: [cellText(String(v))],
+                  width: { size: h === "Bod" ? dxa(16) : dxa(10), type: WidthType.DXA },
+                  shading: h === "Bod" ? { type: ShadingType.CLEAR, fill: "E6E6E6" } : undefined,
+                  children: [cellText(h, true)],
                 })
               ),
             ],
-          })
-        ),
-      ],
-    });
+          }),
+          ...st.map((s, i) =>
+            new TableRow({
+              children: [
+                new TableCell({ children: [cellText(String(i + 1))] }),
+                new TableCell({ children: [cellText(teamName.get(s.team_id) || "", false, "left")] }),
+                ...[
+                  s.ut, s.p, s.n, s.i,
+                  s.gplus, s.gminus, s.gr, s.bodovi,
+                ].map((v, idx) =>
+                  new TableCell({
+                    shading: idx === 7 ? { type: ShadingType.CLEAR, fill: "E6E6E6" } : undefined,
+                    children: [cellText(String(v))],
+                  })
+                ),
+              ],
+            })
+          ),
+        ],
+      })
+    );
 
-    // -------- IDUĆE KOLO --------
-    const nextTable = new Table({
-      layout: TableLayoutType.FIXED,
-      width: { size: dxa(135), type: WidthType.DXA },
-      rows: [
-        new TableRow({
-          children: [
-            new TableCell({ width: { size: dxa(26), type: WidthType.DXA }, children: [cellText("Datum", true)] }),
-            new TableCell({ width: { size: dxa(22), type: WidthType.DXA }, children: [cellText("Vrijeme", true)] }),
-            new TableCell({ width: { size: dxa(43), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
-            new TableCell({ width: { size: dxa(44), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
-          ],
+    // -------- IDUĆE KOLO (samo ako postoji) --------
+    if (nx.length) {
+      children.push(
+        new Paragraph({}),
+        new Paragraph({
+          children: [new TextRun({ text: `${round + 1}. kolo`, bold: true, font: "Calibri", size: 24 })],
         }),
-        ...nx.map(f =>
-          new TableRow({
-            children: [
-              new TableCell({ children: [cellText(f.match_date ? new Date(f.match_date).toLocaleDateString("hr-HR") : "")] }),
-              new TableCell({ children: [cellText(f.match_time?.slice(0,5) || "")] }),
-              new TableCell({ children: [cellText(teamName.get(f.home_team_id) || "", false, "left")] }),
-              new TableCell({ children: [cellText(teamName.get(f.away_team_id) || "", false, "left")] }),
-            ],
-          })
-        ),
-      ],
-    });
+        new Table({
+          layout: TableLayoutType.FIXED,
+          width: { size: dxa(135), type: WidthType.DXA },
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({ width: { size: dxa(26), type: WidthType.DXA }, children: [cellText("Datum", true)] }),
+                new TableCell({ width: { size: dxa(22), type: WidthType.DXA }, children: [cellText("Vrijeme", true)] }),
+                new TableCell({ width: { size: dxa(43), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
+                new TableCell({ width: { size: dxa(44), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
+              ],
+            }),
+            ...nx.map(f =>
+              new TableRow({
+                children: [
+                  new TableCell({ children: [cellText(f.match_date ? new Date(f.match_date).toLocaleDateString("hr-HR") : "")] }),
+                  new TableCell({ children: [cellText(f.match_time?.slice(0,5) || "")] }),
+                  new TableCell({ children: [cellText(teamName.get(f.home_team_id) || "", false, "left")] }),
+                  new TableCell({ children: [cellText(teamName.get(f.away_team_id) || "", false, "left")] }),
+                ],
+              })
+            ),
+          ],
+        })
+      );
+    }
 
     return {
       footers: {
@@ -212,39 +243,7 @@ export async function GET(
           ],
         }),
       },
-      children: [
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: `${round}. kolo`, bold: true, font: "Calibri", size: 24 })],
-        }),
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: "Malonogometna liga Panadić 2025/26", font: "Calibri", size: 24 })],
-        }),
-
-        new Paragraph({}),
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: lg.label, bold: true, font: "Calibri", size: 24 })],
-        }),
-
-        new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true, font: "Calibri", size: 24 })] }),
-        resultsTable,
-
-        new Paragraph({}),
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: "Tablica", bold: true, font: "Calibri", size: 24 })],
-        }),
-        new Paragraph({}),
-        standingsTable,
-
-        new Paragraph({}),
-        new Paragraph({
-          children: [new TextRun({ text: `${round + 1}. kolo`, bold: true, font: "Calibri", size: 24 })],
-        }),
-        nextTable,
-      ],
+      children,
     };
   }).filter(Boolean) as any[];
 
