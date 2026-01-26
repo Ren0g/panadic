@@ -104,7 +104,6 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
 
       const finalStandings =
         (rawStandings as Standing[] | null)
-          ?.filter((s) => !teamPlaceholderMap[s.team_id])
           .map((s) => ({
             ...s,
             team_name: teamMap[s.team_id] ?? "Nepoznato",
