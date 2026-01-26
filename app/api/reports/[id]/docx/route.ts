@@ -23,15 +23,12 @@ const supabase = createClient(
 );
 
 /**
- * JASNO definirane lige + faze
- * (ovo je KLJUČ da Word zna razliku REG / GOLD / SILVER)
+ * TOČAN REDOSLIJED LIGA (kao u PDF-u i pravilima)
  */
 const LEAGUES = [
-  { db: "PRSTICI_REG", label: "Prstići", phase: "REGULAR" },
-  { db: "MLPIONIRI_REG", label: "Mlađi pioniri", phase: "REGULAR" },
   { db: "PIONIRI_REG", label: "Pioniri", phase: "REGULAR" },
-  { db: "POC_REG_A", label: "Početnici A", phase: "REGULAR" },
-  { db: "POC_REG_B", label: "Početnici B", phase: "REGULAR" },
+  { db: "MLPIONIRI_REG", label: "Mlađi pioniri", phase: "REGULAR" },
+  { db: "PRSTICI_REG", label: "Prstići", phase: "REGULAR" },
   { db: "POC_GOLD", label: "Zlatna liga", phase: "GOLD" },
   { db: "POC_SILVER", label: "Srebrna liga", phase: "SILVER" },
 ];
@@ -66,11 +63,16 @@ export async function GET(
 
   const { data: teams } = await supabase.from("teams").select("id,name");
   const teamName = new Map<number, string>();
-  (teams || []).forEach(t => teamName.set(t.id, t.name));
+  (teams || []).forEach(t => teamName.set(Number(t.id), t.name));
 
+  /**
+   * UZIMAMO SVE FIXTURES ZA KOLO
+   * i NAKNADNO IH GRUPIRAMO PO LIGI
+   */
   const { data: fixtures } = await supabase
     .from("fixtures")
     .select(`
+      id,
       league_code,
       home_team_id,
       away_team_id,
@@ -91,51 +93,41 @@ export async function GET(
   const { data: standings } = await supabase.from("standings").select("*");
 
   const sections = LEAGUES.map(lg => {
-    const fx = (fixtures || []).filter(f => f.league_code === lg.db);
+    const fx = (fixtures || [])
+      .filter(f => f.league_code === lg.db)
+      .sort((a, b) => a.id - b.id); // 🔑 DA SE NIŠTA NE IZGUBI
+
     const nx = (nextFixtures || []).filter(f => f.league_code === lg.db);
 
-    /**
-     * 🔑 KLJUČNA ISPRAVKA:
-     * Word sad filtrira standings i po league_code I po phase
-     */
     const st = (standings || [])
-      .filter(
-        s => s.league_code === lg.db && s.phase === lg.phase
-      )
+      .filter(s => s.league_code === lg.db && s.phase === lg.phase)
       .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
 
-    /**
-     * Liga se prikaže ako ima:
-     * - tablicu
-     * - ili rezultate
-     * - ili sljedeće kolo
-     */
-    if (!st.length && !fx.length && !nx.length) return null;
+    if (!fx.length && !st.length && !nx.length) return null;
 
     const children = [
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new TextRun({ text: `${round}. kolo`, bold: true, size: 24, font: "Calibri" }),
+          new TextRun({ text: `${round}. kolo`, bold: true, size: 24 }),
         ],
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new TextRun({ text: "Malonogometna liga Panadić 2025/26", size: 24, font: "Calibri" }),
+          new TextRun({ text: "Malonogometna liga Panadić 2025/26", size: 24 }),
         ],
       }),
       new Paragraph({}),
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [
-          new TextRun({ text: lg.label, bold: true, size: 24, font: "Calibri" }),
-        ],
+        children: [new TextRun({ text: lg.label, bold: true, size: 24 })],
       }),
 
       ...(fx.length ? [
+        new Paragraph({}),
         new Paragraph({
-          children: [new TextRun({ text: "Rezultati", bold: true, size: 24, font: "Calibri" })],
+          children: [new TextRun({ text: "Rezultati", bold: true, size: 24 })],
         }),
         new Table({
           layout: TableLayoutType.FIXED,
@@ -156,8 +148,8 @@ export async function GET(
                   : "-:-";
               return new TableRow({
                 children: [
-                  new TableCell({ children: [cellText(teamName.get(f.home_team_id) || "", false, "left")] }),
-                  new TableCell({ children: [cellText(teamName.get(f.away_team_id) || "", false, "left")] }),
+                  new TableCell({ children: [cellText(teamName.get(Number(f.home_team_id)) || "", false, "left")] }),
+                  new TableCell({ children: [cellText(teamName.get(Number(f.away_team_id)) || "", false, "left")] }),
                   new TableCell({ children: [cellText(score)] }),
                 ],
               });
@@ -170,7 +162,7 @@ export async function GET(
         new Paragraph({}),
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: "Tablica", bold: true, size: 24, font: "Calibri" })],
+          children: [new TextRun({ text: "Tablica", bold: true, size: 24 })],
         }),
         new Table({
           layout: TableLayoutType.FIXED,
@@ -192,40 +184,9 @@ export async function GET(
               new TableRow({
                 children: [
                   new TableCell({ children: [cellText(String(i + 1))] }),
-                  new TableCell({ children: [cellText(teamName.get(s.team_id) || "", false, "left")] }),
+                  new TableCell({ children: [cellText(teamName.get(Number(s.team_id)) || "", false, "left")] }),
                   ...[s.ut, s.p, s.n, s.i, s.gplus, s.gminus, s.gr, s.bodovi]
                     .map(v => new TableCell({ children: [cellText(String(v))] })),
-                ],
-              })
-            ),
-          ],
-        }),
-      ] : []),
-
-      ...(nx.length ? [
-        new Paragraph({}),
-        new Paragraph({
-          children: [new TextRun({ text: `${round + 1}. kolo`, bold: true, size: 24, font: "Calibri" })],
-        }),
-        new Table({
-          layout: TableLayoutType.FIXED,
-          width: { size: dxa(135), type: WidthType.DXA },
-          rows: [
-            new TableRow({
-              children: [
-                new TableCell({ children: [cellText("Datum", true)] }),
-                new TableCell({ children: [cellText("Vrijeme", true)] }),
-                new TableCell({ children: [cellText("Domaćin", true)] }),
-                new TableCell({ children: [cellText("Gost", true)] }),
-              ],
-            }),
-            ...nx.map(f =>
-              new TableRow({
-                children: [
-                  new TableCell({ children: [cellText(f.match_date ? new Date(f.match_date).toLocaleDateString("hr-HR") : "")] }),
-                  new TableCell({ children: [cellText(f.match_time?.slice(0,5) || "")] }),
-                  new TableCell({ children: [cellText(teamName.get(f.home_team_id) || "", false, "left")] }),
-                  new TableCell({ children: [cellText(teamName.get(f.away_team_id) || "", false, "left")] }),
                 ],
               })
             ),
@@ -240,7 +201,7 @@ export async function GET(
           children: [
             new Paragraph({
               alignment: AlignmentType.CENTER,
-              children: [new TextRun({ text: "panadic.vercel.app", font: "Calibri", size: 24 })],
+              children: [new TextRun({ text: "panadic.vercel.app", size: 24 })],
             }),
           ],
         }),
