@@ -13,8 +13,6 @@ import {
   WidthType,
   AlignmentType,
   Footer,
-  TableLayoutType,
-  ShadingType,
 } from "docx";
 
 const supabase = createClient(
@@ -22,37 +20,24 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// SVE LIGE
-const ALL_LEAGUES = [
-  { db: "PRSTICI_REG", label: "Prstići" },
-  { db: "MLPIONIRI_REG", label: "Mlađi pioniri" },
+const LEAGUES = [
   { db: "PIONIRI_REG", label: "Pioniri" },
+  { db: "MLPIONIRI_REG", label: "Mlađi pioniri" },
+  { db: "PRSTICI_REG", label: "Prstići" },
   { db: "POC_REG_A", label: "Početnici A" },
   { db: "POC_REG_B", label: "Početnici B" },
   { db: "POC_GOLD", label: "Zlatna liga" },
   { db: "POC_SILVER", label: "Srebrna liga" },
 ];
 
-const dxa = (mm: number) => Math.round(mm * 56.7);
-
-const cellText = (
-  text: string,
-  bold = false,
-  align: "left" | "center" = "center"
-) =>
-  new Paragraph({
-    alignment: align === "left" ? AlignmentType.LEFT : AlignmentType.CENTER,
-    children: [
-      new TextRun({ text, bold, size: 24, font: "Calibri" }),
-    ],
-  });
-
 export async function GET(
   _req: Request,
   { params }: { params: { id: string } }
 ) {
   const reportId = Number(params.id);
-  if (!reportId) return new Response("Neispravan ID", { status: 400 });
+  if (!reportId) {
+    return new Response("Neispravan ID", { status: 400 });
+  }
 
   const { data: report } = await supabase
     .from("reports")
@@ -60,23 +45,15 @@ export async function GET(
     .eq("id", reportId)
     .single();
 
-  if (!report) return new Response("Ne postoji izvještaj", { status: 404 });
-  const round = report.round;
+  if (!report) {
+    return new Response("Ne postoji izvještaj", { status: 404 });
+  }
 
-  // 🔴 POSLOVNO PRAVILO
-  // od 8. kola nadalje: A/B više NE POSTOJE
-  const LEAGUES =
-    round >= 8
-      ? ALL_LEAGUES.filter(l =>
-          l.db !== "POC_REG_A" && l.db !== "POC_REG_B"
-        )
-      : ALL_LEAGUES.filter(l =>
-          l.db !== "POC_GOLD" && l.db !== "POC_SILVER"
-        );
+  const round = report.round;
 
   const { data: teams } = await supabase
     .from("teams")
-    .select("id,name");
+    .select("id, name");
 
   const teamName = new Map<number, string>();
   (teams || []).forEach(t => teamName.set(t.id, t.name));
@@ -91,28 +68,79 @@ export async function GET(
     `)
     .eq("round", round);
 
-  const { data: nextFixtures } = await supabase
-    .from("fixtures")
-    .select(`
-      league_code, match_date, match_time,
-      home_team_id, away_team_id
-    `)
-    .eq("round", round + 1)
-    .order("match_date")
-    .order("match_time");
-
   const { data: standings } = await supabase
     .from("standings")
     .select("*");
 
+  const makeTable = (rows: string[][], header = false) =>
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: rows.map((r, i) =>
+        new TableRow({
+          children: r.map(c =>
+            new TableCell({
+              children: [
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  children: [
+                    new TextRun({
+                      text: c,
+                      bold: header && i === 0,
+                    }),
+                  ],
+                }),
+              ],
+            })
+          ),
+        })
+      ),
+    });
+
   const sections = LEAGUES.map(lg => {
     const fx = (fixtures || []).filter(f => f.league_code === lg.db);
-    if (!fx.length) return null;
+    const st = (standings || []).filter(s => s.league_code === lg.db);
 
-    const nx = (nextFixtures || []).filter(f => f.league_code === lg.db);
-    const st = (standings || [])
-      .filter(s => s.league_code === lg.db)
-      .sort((a, b) => b.bodovi - a.gr);
+    if (fx.length === 0 && st.length === 0) return null;
+
+    const resultsTable = makeTable(
+      [
+        ["Domaćin", "Gost", "Rezultat"],
+        ...fx.map(f => {
+          const r = Array.isArray(f.results) ? f.results[0] : f.results;
+          const score =
+            r && r.home_goals != null && r.away_goals != null
+              ? `${r.home_goals}:${r.away_goals}`
+              : "-:-";
+          return [
+            teamName.get(f.home_team_id) || "",
+            teamName.get(f.away_team_id) || "",
+            score,
+          ];
+        }),
+      ],
+      true
+    );
+
+    const standingsTable = makeTable(
+      [
+        ["#", "Ekipa", "UT", "P", "N", "I", "G+", "G-", "GR", "B"],
+        ...st
+          .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr)
+          .map((s, i) => [
+            String(i + 1),
+            teamName.get(s.team_id) || "",
+            String(s.ut),
+            String(s.p),
+            String(s.n),
+            String(s.i),
+            String(s.gplus),
+            String(s.gminus),
+            String(s.gr),
+            String(s.bodovi),
+          ]),
+      ],
+      true
+    );
 
     return {
       footers: {
@@ -120,13 +148,7 @@ export async function GET(
           children: [
             new Paragraph({
               alignment: AlignmentType.CENTER,
-              children: [
-                new TextRun({
-                  text: "panadic.vercel.app",
-                  size: 24,
-                  font: "Calibri",
-                }),
-              ],
+              children: [new TextRun("panadic.vercel.app")],
             }),
           ],
         }),
@@ -136,78 +158,27 @@ export async function GET(
           alignment: AlignmentType.CENTER,
           children: [
             new TextRun({
-              text: `${round}. kolo`,
+              text: `${lg.label} – ${round}. kolo`,
               bold: true,
-              size: 24,
-              font: "Calibri",
+              size: 28,
             }),
           ],
         }),
-
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          children: [
-            new TextRun({
-              text: "Malonogometna liga Panadić 2025/26",
-              size: 24,
-              font: "Calibri",
-            }),
-          ],
-        }),
-
         new Paragraph({}),
         new Paragraph({
-          alignment: AlignmentType.CENTER,
-          children: [
-            new TextRun({
-              text: lg.label,
-              bold: true,
-              size: 24,
-              font: "Calibri",
-            }),
-          ],
+          children: [new TextRun({ text: "Rezultati", bold: true })],
         }),
-
+        resultsTable,
+        new Paragraph({}),
         new Paragraph({
-          children: [new TextRun({ text: "Rezultati", bold: true, size: 24 })],
+          children: [new TextRun({ text: "Tablica", bold: true })],
         }),
-
-        new Table({
-          layout: TableLayoutType.FIXED,
-          width: { size: dxa(100), type: WidthType.DXA },
-          rows: [
-            new TableRow({
-              children: [
-                new TableCell({ children: [cellText("Domaćin", true)] }),
-                new TableCell({ children: [cellText("Gost", true)] }),
-                new TableCell({ children: [cellText("Rezultat", true)] }),
-              ],
-            }),
-            ...fx.map(f => {
-              const r = Array.isArray(f.results) ? f.results[0] : f.results;
-              const score =
-                r && r.home_goals != null && r.away_goals != null
-                  ? `${r.home_goals}:${r.away_goals}`
-                  : "-:-";
-              return new TableRow({
-                children: [
-                  new TableCell({
-                    children: [cellText(teamName.get(f.home_team_id) || "", false, "left")],
-                  }),
-                  new TableCell({
-                    children: [cellText(teamName.get(f.away_team_id) || "", false, "left")],
-                  }),
-                  new TableCell({ children: [cellText(score)] }),
-                ],
-              });
-            }),
-          ],
-        }),
+        standingsTable,
       ],
     };
   }).filter(Boolean);
 
-  const doc = new Document({ sections });
+  const doc = new Document({ sections: sections as any[] });
   const buffer = await Packer.toBuffer(doc);
 
   return new Response(new Uint8Array(buffer), {
