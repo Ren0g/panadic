@@ -22,14 +22,18 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+/**
+ * JASNO definirane lige + faze
+ * (ovo je KLJUČ da Word zna razliku REG / GOLD / SILVER)
+ */
 const LEAGUES = [
-  { db: "PRSTICI_REG", label: "Prstići" },
-  { db: "MLPIONIRI_REG", label: "Mlađi pioniri" },
-  { db: "PIONIRI_REG", label: "Pioniri" },
-  { db: "POC_REG_A", label: "Početnici A" },
-  { db: "POC_REG_B", label: "Početnici B" },
-  { db: "POC_GOLD", label: "Zlatna liga" },
-  { db: "POC_SILVER", label: "Srebrna liga" },
+  { db: "PRSTICI_REG", label: "Prstići", phase: "REGULAR" },
+  { db: "MLPIONIRI_REG", label: "Mlađi pioniri", phase: "REGULAR" },
+  { db: "PIONIRI_REG", label: "Pioniri", phase: "REGULAR" },
+  { db: "POC_REG_A", label: "Početnici A", phase: "REGULAR" },
+  { db: "POC_REG_B", label: "Početnici B", phase: "REGULAR" },
+  { db: "POC_GOLD", label: "Zlatna liga", phase: "GOLD" },
+  { db: "POC_SILVER", label: "Srebrna liga", phase: "SILVER" },
 ];
 
 const dxa = (mm: number) => Math.round(mm * 56.7);
@@ -89,30 +93,50 @@ export async function GET(
   const sections = LEAGUES.map(lg => {
     const fx = (fixtures || []).filter(f => f.league_code === lg.db);
     const nx = (nextFixtures || []).filter(f => f.league_code === lg.db);
+
+    /**
+     * 🔑 KLJUČNA ISPRAVKA:
+     * Word sad filtrira standings i po league_code I po phase
+     */
     const st = (standings || [])
-      .filter(s => s.league_code === lg.db)
+      .filter(
+        s => s.league_code === lg.db && s.phase === lg.phase
+      )
       .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
 
-    // 🔴 Drugi dio natjecanja – liga postoji ako ima standings
-    if (!st.length) return null;
+    /**
+     * Liga se prikaže ako ima:
+     * - tablicu
+     * - ili rezultate
+     * - ili sljedeće kolo
+     */
+    if (!st.length && !fx.length && !nx.length) return null;
 
     const children = [
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: `${round}. kolo`, bold: true, size: 24, font: "Calibri" })],
+        children: [
+          new TextRun({ text: `${round}. kolo`, bold: true, size: 24, font: "Calibri" }),
+        ],
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: "Malonogometna liga Panadić 2025/26", size: 24, font: "Calibri" })],
+        children: [
+          new TextRun({ text: "Malonogometna liga Panadić 2025/26", size: 24, font: "Calibri" }),
+        ],
       }),
       new Paragraph({}),
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: lg.label, bold: true, size: 24, font: "Calibri" })],
+        children: [
+          new TextRun({ text: lg.label, bold: true, size: 24, font: "Calibri" }),
+        ],
       }),
 
       ...(fx.length ? [
-        new Paragraph({ children: [new TextRun({ text: "Rezultati", bold: true, size: 24, font: "Calibri" })] }),
+        new Paragraph({
+          children: [new TextRun({ text: "Rezultati", bold: true, size: 24, font: "Calibri" })],
+        }),
         new Table({
           layout: TableLayoutType.FIXED,
           width: { size: dxa(100), type: WidthType.DXA },
@@ -142,39 +166,41 @@ export async function GET(
         }),
       ] : []),
 
-      new Paragraph({}),
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: "Tablica", bold: true, size: 24, font: "Calibri" })],
-      }),
-      new Table({
-        layout: TableLayoutType.FIXED,
-        width: { size: dxa(165), type: WidthType.DXA },
-        rows: [
-          new TableRow({
-            children: [
-              new TableCell({ children: [cellText("R.br", true)] }),
-              new TableCell({ children: [cellText("Ekipa", true)] }),
-              ...["UT","P","N","I","G+","G-","GR","Bod"].map(h =>
-                new TableCell({
-                  shading: h === "Bod" ? { type: ShadingType.CLEAR, fill: "E6E6E6" } : undefined,
-                  children: [cellText(h, true)],
-                })
-              ),
-            ],
-          }),
-          ...st.map((s, i) =>
+      ...(st.length ? [
+        new Paragraph({}),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [new TextRun({ text: "Tablica", bold: true, size: 24, font: "Calibri" })],
+        }),
+        new Table({
+          layout: TableLayoutType.FIXED,
+          width: { size: dxa(165), type: WidthType.DXA },
+          rows: [
             new TableRow({
               children: [
-                new TableCell({ children: [cellText(String(i + 1))] }),
-                new TableCell({ children: [cellText(teamName.get(s.team_id) || "", false, "left")] }),
-                ...[s.ut, s.p, s.n, s.i, s.gplus, s.gminus, s.gr, s.bodovi]
-                  .map(v => new TableCell({ children: [cellText(String(v))] })),
+                new TableCell({ children: [cellText("R.br", true)] }),
+                new TableCell({ children: [cellText("Ekipa", true)] }),
+                ...["UT","P","N","I","G+","G-","GR","Bod"].map(h =>
+                  new TableCell({
+                    shading: h === "Bod" ? { type: ShadingType.CLEAR, fill: "E6E6E6" } : undefined,
+                    children: [cellText(h, true)],
+                  })
+                ),
               ],
-            })
-          ),
-        ],
-      }),
+            }),
+            ...st.map((s, i) =>
+              new TableRow({
+                children: [
+                  new TableCell({ children: [cellText(String(i + 1))] }),
+                  new TableCell({ children: [cellText(teamName.get(s.team_id) || "", false, "left")] }),
+                  ...[s.ut, s.p, s.n, s.i, s.gplus, s.gminus, s.gr, s.bodovi]
+                    .map(v => new TableCell({ children: [cellText(String(v))] })),
+                ],
+              })
+            ),
+          ],
+        }),
+      ] : []),
 
       ...(nx.length ? [
         new Paragraph({}),
