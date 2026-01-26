@@ -23,14 +23,14 @@ const supabase = createClient(
 );
 
 /**
- * TOČAN REDOSLIJED LIGA (kao u PDF-u i pravilima)
+ * TOČAN REDOSLIJED LIGA
  */
 const LEAGUES = [
-  { db: "PIONIRI_REG", label: "Pioniri", phase: "REGULAR" },
-  { db: "MLPIONIRI_REG", label: "Mlađi pioniri", phase: "REGULAR" },
-  { db: "PRSTICI_REG", label: "Prstići", phase: "REGULAR" },
-  { db: "POC_GOLD", label: "Zlatna liga", phase: "GOLD" },
-  { db: "POC_SILVER", label: "Srebrna liga", phase: "SILVER" },
+  { db: "PIONIRI_REG", label: "Pioniri" },
+  { db: "MLPIONIRI_REG", label: "Mlađi pioniri" },
+  { db: "PRSTICI_REG", label: "Prstići" },
+  { db: "POC_GOLD", label: "Zlatna liga" },
+  { db: "POC_SILVER", label: "Srebrna liga" },
 ];
 
 const dxa = (mm: number) => Math.round(mm * 56.7);
@@ -65,10 +65,6 @@ export async function GET(
   const teamName = new Map<number, string>();
   (teams || []).forEach(t => teamName.set(Number(t.id), t.name));
 
-  /**
-   * UZIMAMO SVE FIXTURES ZA KOLO
-   * i NAKNADNO IH GRUPIRAMO PO LIGI
-   */
   const { data: fixtures } = await supabase
     .from("fixtures")
     .select(`
@@ -80,42 +76,31 @@ export async function GET(
     `)
     .eq("round", round);
 
-  const { data: nextFixtures } = await supabase
-    .from("fixtures")
-    .select(`
-      league_code, match_date, match_time,
-      home_team_id, away_team_id
-    `)
-    .eq("round", round + 1)
-    .order("match_date")
-    .order("match_time");
-
   const { data: standings } = await supabase.from("standings").select("*");
 
   const sections = LEAGUES.map(lg => {
     const fx = (fixtures || [])
       .filter(f => f.league_code === lg.db)
-      .sort((a, b) => a.id - b.id); // 🔑 DA SE NIŠTA NE IZGUBI
-
-    const nx = (nextFixtures || []).filter(f => f.league_code === lg.db);
+      .sort((a, b) => a.id - b.id);
 
     const st = (standings || [])
-      .filter(s => s.league_code === lg.db && s.phase === lg.phase)
+      .filter(s => s.league_code === lg.db)
       .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
 
-    if (!fx.length && !st.length && !nx.length) return null;
+    if (!fx.length && !st.length) return null;
 
     const children = [
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [
-          new TextRun({ text: `${round}. kolo`, bold: true, size: 24 }),
-        ],
+        children: [new TextRun({ text: `${round}. kolo`, bold: true, size: 24 })],
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new TextRun({ text: "Malonogometna liga Panadić 2025/26", size: 24 }),
+          new TextRun({
+            text: "Malonogometna liga Panadić 2025/26",
+            size: 24,
+          }),
         ],
       }),
       new Paragraph({}),
@@ -195,19 +180,7 @@ export async function GET(
       ] : []),
     ];
 
-    return {
-      footers: {
-        default: new Footer({
-          children: [
-            new Paragraph({
-              alignment: AlignmentType.CENTER,
-              children: [new TextRun({ text: "panadic.vercel.app", size: 24 })],
-            }),
-          ],
-        }),
-      },
-      children,
-    };
+    return { children };
   }).filter(Boolean);
 
   const doc = new Document({ sections });
