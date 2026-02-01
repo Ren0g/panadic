@@ -49,7 +49,7 @@ const cellText = (
       new TextRun({
         text,
         bold,
-        size: 24, // 12pt
+        size: 24,
         font: "Calibri",
       }),
     ],
@@ -76,12 +76,13 @@ export async function GET(
   const teamName = new Map<number, string>();
   (teams || []).forEach(t => teamName.set(Number(t.id), t.name));
 
-  // ---- REZULTATI (⚠️ DODAN ORDER BY)
+  // ---- REZULTATI (⬅️ KLJUČNA PROMJENA)
+  // Uzimamo sve do ovog kola, a filtriramo kasnije
   const { data: results } = await supabase
     .from("report_results")
     .select("*")
-    .eq("round", round)
-    .order("match_date", { ascending: true })
+    .lte("round", round)
+    .order("round", { ascending: true })
     .order("match_time", { ascending: true });
 
   const { data: nextFixtures } = await supabase
@@ -96,10 +97,12 @@ export async function GET(
     .select("*");
 
   const sections = LEAGUES.map(lg => {
-    const fx = (results || []).filter(r => r.league_code === lg.db);
+    const fx = (results || []).filter(
+      r => r.league_code === lg.db && r.round === round
+    );
+
     const nx = (nextFixtures || []).filter(f => f.league_code === lg.db);
 
-    // ⚠️ DETERMINISTIČKO SORTIRANJE TABLICE
     const st = (standings || [])
       .filter(s => s.league_code === lg.db)
       .sort((a, b) => {
@@ -132,9 +135,9 @@ export async function GET(
               : "-:-";
           return new TableRow({
             children: [
-              new TableCell({ width: { size: dxa(35), type: WidthType.DXA }, children: [cellText(teamName.get(Number(f.home_team_id)) || "", false, "left")] }),
-              new TableCell({ width: { size: dxa(35), type: WidthType.DXA }, children: [cellText(teamName.get(Number(f.away_team_id)) || "", false, "left")] }),
-              new TableCell({ width: { size: dxa(30), type: WidthType.DXA }, children: [cellText(score)] }),
+              new TableCell({ children: [cellText(teamName.get(Number(f.home_team_id)) || "", false, "left")] }),
+              new TableCell({ children: [cellText(teamName.get(Number(f.away_team_id)) || "", false, "left")] }),
+              new TableCell({ children: [cellText(score)] }),
             ],
           });
         }),
@@ -162,11 +165,10 @@ export async function GET(
         ...st.map((s, i) =>
           new TableRow({
             children: [
-              new TableCell({ width: { size: dxa(8), type: WidthType.DXA }, children: [cellText(String(i + 1))] }),
-              new TableCell({ width: { size: dxa(30), type: WidthType.DXA }, children: [cellText(teamName.get(Number(s.team_id)) || "", false, "left")] }),
+              new TableCell({ children: [cellText(String(i + 1))] }),
+              new TableCell({ children: [cellText(teamName.get(Number(s.team_id)) || "", false, "left")] }),
               ...[s.ut, s.p, s.n, s.i, s.gplus, s.gminus, s.gr, s.bodovi].map((v, idx) =>
                 new TableCell({
-                  width: { size: idx === 7 ? dxa(16) : dxa(10), type: WidthType.DXA },
                   shading: idx === 7 ? { type: ShadingType.CLEAR, fill: "E6E6E6" } : undefined,
                   children: [cellText(String(v))],
                 })
@@ -184,19 +186,19 @@ export async function GET(
       rows: [
         new TableRow({
           children: [
-            new TableCell({ width: { size: dxa(26), type: WidthType.DXA }, children: [cellText("Datum", true)] }),
-            new TableCell({ width: { size: dxa(22), type: WidthType.DXA }, children: [cellText("Vrijeme", true)] }),
-            new TableCell({ width: { size: dxa(43), type: WidthType.DXA }, children: [cellText("Domaćin", true)] }),
-            new TableCell({ width: { size: dxa(44), type: WidthType.DXA }, children: [cellText("Gost", true)] }),
+            new TableCell({ children: [cellText("Datum", true)] }),
+            new TableCell({ children: [cellText("Vrijeme", true)] }),
+            new TableCell({ children: [cellText("Domaćin", true)] }),
+            new TableCell({ children: [cellText("Gost", true)] }),
           ],
         }),
         ...nx.map(f =>
           new TableRow({
             children: [
-              new TableCell({ width: { size: dxa(26), type: WidthType.DXA }, children: [cellText(f.match_date ? new Date(f.match_date).toLocaleDateString("hr-HR") : "")] }),
-              new TableCell({ width: { size: dxa(22), type: WidthType.DXA }, children: [cellText(f.match_time?.slice(0,5) || "")] }),
-              new TableCell({ width: { size: dxa(43), type: WidthType.DXA }, children: [cellText(teamName.get(Number(f.home_team_id)) || "", false, "left")] }),
-              new TableCell({ width: { size: dxa(44), type: WidthType.DXA }, children: [cellText(teamName.get(Number(f.away_team_id)) || "", false, "left")] }),
+              new TableCell({ children: [cellText(f.match_date ? new Date(f.match_date).toLocaleDateString("hr-HR") : "")] }),
+              new TableCell({ children: [cellText(f.match_time?.slice(0,5) || "")] }),
+              new TableCell({ children: [cellText(teamName.get(Number(f.home_team_id)) || "", false, "left")] }),
+              new TableCell({ children: [cellText(teamName.get(Number(f.away_team_id)) || "", false, "left")] }),
             ],
           })
         ),
