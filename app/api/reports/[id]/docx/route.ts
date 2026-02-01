@@ -71,16 +71,18 @@ export async function GET(
   if (!report) return new Response("Ne postoji izvještaj", { status: 404 });
   const round = report.round;
 
-  // ---- TEAMS MAP (čisto mapiranje ID → ime)
+  // ---- TEAMS MAP (ID → ime)
   const { data: teams } = await supabase.from("teams").select("id,name");
   const teamName = new Map<number, string>();
   (teams || []).forEach(t => teamName.set(Number(t.id), t.name));
 
-  // ---- PODACI ISKLJUČIVO IZ VIEW-OVA
+  // ---- REZULTATI (⚠️ DODAN ORDER BY)
   const { data: results } = await supabase
     .from("report_results")
     .select("*")
-    .eq("round", round);
+    .eq("round", round)
+    .order("match_date", { ascending: true })
+    .order("match_time", { ascending: true });
 
   const { data: nextFixtures } = await supabase
     .from("report_next_fixtures")
@@ -96,13 +98,22 @@ export async function GET(
   const sections = LEAGUES.map(lg => {
     const fx = (results || []).filter(r => r.league_code === lg.db);
     const nx = (nextFixtures || []).filter(f => f.league_code === lg.db);
+
+    // ⚠️ DETERMINISTIČKO SORTIRANJE TABLICE
     const st = (standings || [])
       .filter(s => s.league_code === lg.db)
-      .sort((a, b) => b.bodovi - a.bodovi || b.gr - a.gr);
+      .sort((a, b) => {
+        if (b.bodovi !== a.bodovi) return b.bodovi - a.bodovi;
+        if (b.gr !== a.gr) return b.gr - a.gr;
+        if (b.gplus !== a.gplus) return b.gplus - a.gplus;
+        const an = teamName.get(Number(a.team_id)) || "";
+        const bn = teamName.get(Number(b.team_id)) || "";
+        return an.localeCompare(bn, "hr");
+      });
 
     if (!fx.length && !st.length && !nx.length) return null;
 
-    // -------- REZULTATI (1:1 stari Word)
+    // -------- REZULTATI
     const resultsTable = new Table({
       layout: TableLayoutType.FIXED,
       width: { size: dxa(100), type: WidthType.DXA },
@@ -130,7 +141,7 @@ export async function GET(
       ],
     });
 
-    // -------- TABLICA (točne širine kao stari Word)
+    // -------- TABLICA
     const standingsTable = new Table({
       layout: TableLayoutType.FIXED,
       width: { size: dxa(165), type: WidthType.DXA },
@@ -166,7 +177,7 @@ export async function GET(
       ],
     });
 
-    // -------- IDUĆE KOLO (kao stari Word)
+    // -------- IDUĆE KOLO
     const nextTable = new Table({
       layout: TableLayoutType.FIXED,
       width: { size: dxa(135), type: WidthType.DXA },
