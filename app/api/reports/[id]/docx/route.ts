@@ -70,28 +70,28 @@ export async function GET(
 
   if (!report) return new Response("Ne postoji izvještaj", { status: 404 });
 
-  // koristi se samo za naziv fajla
+  // koristi se samo za ime fajla
   const reportRound = report.round;
 
-  // ---- TEAMS MAP (ID → ime)
+  // ---- TEAMS MAP
   const { data: teams } = await supabase.from("teams").select("id,name");
   const teamName = new Map<number, string>();
   (teams || []).forEach(t => teamName.set(Number(t.id), t.name));
 
-  // ---- REZULTATI (UZMI SVE – svaka liga ima svoje kolo)
+  // ---- REZULTATI (UZMI SVE)
   const { data: results } = await supabase
     .from("report_results")
     .select("*")
-    .order("league_code", { ascending: true })
-    .order("round", { ascending: true })
-    .order("match_time", { ascending: true });
+    .order("league_code")
+    .order("round")
+    .order("match_time");
 
   // ---- IDUĆE UTAKMICE (UZMI SVE)
   const { data: nextFixtures } = await supabase
     .from("report_next_fixtures")
     .select("*")
-    .order("league_code", { ascending: true })
-    .order("round", { ascending: true })
+    .order("league_code")
+    .order("round")
     .order("match_date")
     .order("match_time");
 
@@ -99,19 +99,23 @@ export async function GET(
     .from("report_standings")
     .select("*");
 
-  // ---- MAPA: league_code → zadnje odigrano kolo (iz rezultata)
+  /**
+   * 🔑 ISPRAVNO: ZADNJE KOLO PO LIGI
+   */
   const leagueLastRound = new Map<string, number>();
-  (results || []).forEach((r: any) => {
-    const prev = leagueLastRound.get(r.league_code);
-    if (!prev || r.round > prev) {
-      leagueLastRound.set(r.league_code, r.round);
+  LEAGUES.forEach(lg => {
+    const rounds = (results || [])
+      .filter((r: any) => r.league_code === lg.db)
+      .map((r: any) => Number(r.round));
+    if (rounds.length) {
+      leagueLastRound.set(lg.db, Math.max(...rounds));
     }
   });
 
   const sections = LEAGUES.map(lg => {
-    // 🔑 SIGURNO ODREĐIVANJE KOLA (nikad undefined)
     let leagueRound = leagueLastRound.get(lg.db);
 
+    // fallback iz standings ako nema rezultata
     if (!leagueRound) {
       const stForLeague = (standings || []).filter(
         (s: any) => s.league_code === lg.db
@@ -137,9 +141,10 @@ export async function GET(
         if (b.bodovi !== a.bodovi) return b.bodovi - a.bodovi;
         if (b.gr !== a.gr) return b.gr - a.gr;
         if (b.gplus !== a.gplus) return b.gplus - a.gplus;
-        const an = teamName.get(Number(a.team_id)) || "";
-        const bn = teamName.get(Number(b.team_id)) || "";
-        return an.localeCompare(bn, "hr");
+        return (teamName.get(a.team_id) || "").localeCompare(
+          teamName.get(b.team_id) || "",
+          "hr"
+        );
       });
 
     if (!fx.length && !st.length && !nx.length) return null;
@@ -163,8 +168,8 @@ export async function GET(
               : "-:-";
           return new TableRow({
             children: [
-              new TableCell({ children: [cellText(teamName.get(Number(f.home_team_id)) || "", false, "left")] }),
-              new TableCell({ children: [cellText(teamName.get(Number(f.away_team_id)) || "", false, "left")] }),
+              new TableCell({ children: [cellText(teamName.get(f.home_team_id) || "", false, "left")] }),
+              new TableCell({ children: [cellText(teamName.get(f.away_team_id) || "", false, "left")] }),
               new TableCell({ children: [cellText(score)] }),
             ],
           });
@@ -194,7 +199,7 @@ export async function GET(
           new TableRow({
             children: [
               new TableCell({ children: [cellText(String(i + 1))] }),
-              new TableCell({ children: [cellText(teamName.get(Number(s.team_id)) || "", false, "left")] }),
+              new TableCell({ children: [cellText(teamName.get(s.team_id) || "", false, "left")] }),
               ...[s.ut, s.p, s.n, s.i, s.gplus, s.gminus, s.gr, s.bodovi].map((v: any, idx: number) =>
                 new TableCell({
                   shading: idx === 7 ? { type: ShadingType.CLEAR, fill: "E6E6E6" } : undefined,
@@ -223,10 +228,10 @@ export async function GET(
         ...nx.map((f: any) =>
           new TableRow({
             children: [
-              new TableCell({ children: [cellText(f.match_date ? new Date(f.match_date).toLocaleDateString("hr-HR") : "")] }),
+              new TableCell({ children: [cellText(new Date(f.match_date).toLocaleDateString("hr-HR"))] }),
               new TableCell({ children: [cellText(f.match_time?.slice(0,5) || "")] }),
-              new TableCell({ children: [cellText(teamName.get(Number(f.home_team_id)) || "", false, "left")] }),
-              new TableCell({ children: [cellText(teamName.get(Number(f.away_team_id)) || "", false, "left")] }),
+              new TableCell({ children: [cellText(teamName.get(f.home_team_id) || "", false, "left")] }),
+              new TableCell({ children: [cellText(teamName.get(f.away_team_id) || "", false, "left")] }),
             ],
           })
         ),
