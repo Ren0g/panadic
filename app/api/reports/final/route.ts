@@ -48,8 +48,8 @@ export async function GET() {
     { db: "PIONIRI_FINAL", label: "Pioniri" },
     { db: "MLPIONIRI_FINAL", label: "Mlađi pioniri" },
     { db: "PRSTICI_FINAL", label: "Prstići" },
-    { db: "POC_GOLD_FINAL", label: "Početnici – Zlatna liga" },
-    { db: "POC_SILVER_FINAL", label: "Početnici – Srebrna liga" },
+    { db: "POC_GOLD_FINAL", label: "Zlatna liga" },
+    { db: "POC_SILVER_FINAL", label: "Srebrna liga" },
   ];
 
   const { data: teams } = await supabase.from("teams").select("id,name");
@@ -82,7 +82,7 @@ export async function GET() {
 
     if (!leagueFixtures.length) return null;
 
-    // 🔴 SORTIRANJE PO MJESTU (NE PO VREMENU)
+    // SORTIRANJE PO MJESTU
     leagueFixtures.sort((a: any, b: any) => {
       const aNum = parseInt(a.placement_label);
       const bNum = parseInt(b.placement_label);
@@ -201,7 +201,7 @@ export async function GET() {
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "Content-Disposition": `attachment; filename="FINAL_DAY_2026.docx"`,
+      "Content-Disposition": `attachment; filename="Zavrsni_izvjestaj_2026.docx"`,
       "Cache-Control": "no-store",
     },
   });
