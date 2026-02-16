@@ -9,8 +9,6 @@ type LeagueCode =
   | "PIONIRI"
   | "MLADJI"
   | "PRSTICI"
-  | "POC_A"
-  | "POC_B"
   | "POC_GOLD"
   | "POC_SILVER";
 
@@ -18,8 +16,6 @@ const LEAGUES: { code: LeagueCode; label: string }[] = [
   { code: "PIONIRI", label: "Pioniri" },
   { code: "MLADJI", label: "Mlađi pioniri" },
   { code: "PRSTICI", label: "Prstići" },
-  { code: "POC_A", label: "Početnici A" },
-  { code: "POC_B", label: "Početnici B" },
   { code: "POC_GOLD", label: "Zlatna liga" },
   { code: "POC_SILVER", label: "Srebrna liga" },
 ];
@@ -28,8 +24,6 @@ const LEAGUE_LABELS: Record<string, string> = {
   PIONIRI_REG: "Pioniri",
   MLPIONIRI_REG: "Mlađi pioniri",
   PRSTICI_REG: "Prstići",
-  POC_REG_A: "Početnici A",
-  POC_REG_B: "Početnici B",
   POC_GOLD: "Početnici – Zlatna liga",
   POC_SILVER: "Početnici – Srebrna liga",
 };
@@ -173,7 +167,7 @@ export default function HomePage() {
   return (
     <div className="w-full max-w-5xl mx-auto px-4 py-10 space-y-10">
 
-      {/* ---- LIVE / NEXT MATCH ---- */}
+      {/* LIVE BLOCK */}
       <div className="bg-white rounded-xl border border-[#d9cbb1] shadow p-5">
         {loadingMatch ? (
           <div className="text-center text-gray-500 text-sm">
@@ -185,7 +179,6 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="space-y-3">
-
             <div className="flex justify-between text-xs font-semibold text-[#0A5E2A]">
               <span className="flex items-center gap-2">
                 {currentMatch.status === "live" ? (
@@ -230,7 +223,7 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* ---- FINAL DAY ---- */}
+      {/* FINAL DAY BLOCK */}
       {finalFixtures.length > 0 && (
         <div className="bg-white rounded-xl border border-[#d9cbb1] shadow p-5">
           <h2 className="text-xl font-bold text-center mb-6 text-[#0A5E2A]">
@@ -262,7 +255,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ---- LEAGUE SELECTOR ---- */}
+      {/* LEAGUE SELECTOR */}
       <div className="flex justify-center">
         <LeagueSelector
           leagues={LEAGUES}
