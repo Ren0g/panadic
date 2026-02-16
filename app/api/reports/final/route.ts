@@ -73,8 +73,7 @@ export async function GET() {
       )
     `)
     .like("league_code", "%_FINAL")
-    .eq("match_date", "2026-02-21")
-    .order("match_time");
+    .eq("match_date", "2026-02-21");
 
   const sections = FINAL_LEAGUES.map(lg => {
     const leagueFixtures = (fixtures || []).filter(
@@ -82,6 +81,13 @@ export async function GET() {
     );
 
     if (!leagueFixtures.length) return null;
+
+    // 🔴 SORTIRANJE PO MJESTU (NE PO VREMENU)
+    leagueFixtures.sort((a: any, b: any) => {
+      const aNum = parseInt(a.placement_label);
+      const bNum = parseInt(b.placement_label);
+      return aNum - bNum;
+    });
 
     const table = new Table({
       layout: TableLayoutType.FIXED,
