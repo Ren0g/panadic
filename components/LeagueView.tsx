@@ -53,7 +53,6 @@ type FinalMatch = {
   time: string;
   home: string;
   away: string;
-  placement_label: string | null;
 };
 
 const FINAL_DAY_ISO = "2026-02-21";
@@ -83,7 +82,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
     // ---------------------------
     const dbLeagueCode = LEAGUE_DB_CODE[leagueCode];
 
-    const { data: rawStandings } = await supabase
+    const { data: rawStandings, error: standingsErr } = await supabase
       .from("standings")
       .select("*")
       .eq("league_code", dbLeagueCode)
@@ -98,41 +97,42 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         team_name: teamMap[s.team_id] ?? "Nepoznato",
       })) ?? [];
 
-    setStandings(final);
+    // Ako standings uopće ne postoji za tu ligu, barem ne rušimo prikaz
+    if (!standingsErr) setStandings(final);
 
     // ---------------------------
     // FINAL MATCHES (PO LIGI)
     // ---------------------------
     const finalCode = FINAL_DB_CODE[leagueCode];
 
-    // Povuci SVE finalne utakmice te lige (bez hard filtera po datumu)
-    const { data: finalFixtures } = await supabase
+    const { data: finalFixtures, error: finalErr } = await supabase
       .from("fixtures")
-      .select(
-        "id, match_date, match_time, placement_label, home_team_id, away_team_id"
-      )
+      .select("id, match_date, match_time, home_team_id, away_team_id")
       .eq("league_code", finalCode)
       .order("match_date", { ascending: true })
       .order("match_time", { ascending: true });
 
-    const allFinal = finalFixtures ?? [];
+    if (finalErr || !finalFixtures) {
+      setFinalMatches([]);
+      setLoading(false);
+      return;
+    }
 
-    // Pokušaj uzeti baš 21.02.2026 (ako u bazi točno postoji)
+    const allFinal = finalFixtures;
+
+    // Prvo probaj baš taj datum
     const finalDay = allFinal.filter((f: any) => f.match_date === FINAL_DAY_ISO);
 
-    // Ako nema nijedne za taj datum (zbog različitog zapisa u bazi),
-    // prikaži sve finalne za tu ligu umjesto praznog ekrana.
+    // Ako nema ništa za taj datum (različit zapis u bazi), pokaži sve finalne te lige
     const toShow = finalDay.length > 0 ? finalDay : allFinal;
 
-    const formatted: FinalMatch[] =
-      toShow.map((f: any) => ({
-        id: String(f.id),
-        date: new Date(f.match_date).toLocaleDateString("hr-HR"),
-        time: f.match_time?.substring(0, 5) ?? "",
-        home: teamMap[f.home_team_id] ?? "Nepoznato",
-        away: teamMap[f.away_team_id] ?? "Nepoznato",
-        placement_label: f.placement_label ?? null,
-      })) ?? [];
+    const formatted: FinalMatch[] = toShow.map((f: any) => ({
+      id: String(f.id),
+      date: new Date(f.match_date).toLocaleDateString("hr-HR"),
+      time: f.match_time?.substring(0, 5) ?? "",
+      home: teamMap[f.home_team_id] ?? "Nepoznato",
+      away: teamMap[f.away_team_id] ?? "Nepoznato",
+    }));
 
     setFinalMatches(formatted);
 
@@ -207,8 +207,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
                 </span>
 
                 <span className="sm:text-right text-[#fcefd5]">
-                  {m.date} {m.time && `u ${m.time}`}{" "}
-                  {m.placement_label && `• ${m.placement_label}`}
+                  {m.date} {m.time && `u ${m.time}`}
                 </span>
               </li>
             ))}
