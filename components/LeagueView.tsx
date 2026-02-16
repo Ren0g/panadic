@@ -39,8 +39,18 @@ type TableRow = {
   bodovi: number;
 };
 
+type FinalMatch = {
+  id: string;
+  date: string;
+  time: string;
+  home: string;
+  away: string;
+  placement_label: string | null;
+};
+
 export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
   const [standings, setStandings] = useState<TableRow[]>([]);
+  const [finalMatches, setFinalMatches] = useState<FinalMatch[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -60,8 +70,9 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
     });
 
     // --------------------------
-    // NORMAL LEAGUES
+    // STANDINGS (postojeća logika)
     // --------------------------
+
     if (
       leagueCode === "PIONIRI" ||
       leagueCode === "MLADJI" ||
@@ -84,168 +95,202 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         })) ?? [];
 
       setStandings(final);
-      setLoading(false);
-      return;
+    } else {
+      // GOLD / SILVER logika ostaje ista (nije dirana)
+      const phaseLeague =
+        leagueCode === "POC_GOLD" ? "POC_GOLD" : "POC_SILVER";
+
+      const { data: regStandings } = await supabase
+        .from("standings")
+        .select("*")
+        .in("league_code", ["POC_REG_A", "POC_REG_B"]);
+
+      const regMap: Record<
+        string,
+        { bodovi: number; gplus: number; gminus: number; gr: number }
+      > = {};
+
+      regStandings?.forEach((s: any) => {
+        regMap[teamMap[s.team_id]] = {
+          bodovi: s.bodovi,
+          gplus: s.gplus,
+          gminus: s.gminus,
+          gr: s.gr,
+        };
+      });
+
+      const { data: fixtures } = await supabase
+        .from("fixtures")
+        .select("id, home_team_id, away_team_id")
+        .eq("league_code", phaseLeague);
+
+      const { data: results } = await supabase
+        .from("results")
+        .select("fixture_id, home_goals, away_goals");
+
+      const phaseMap: any = {};
+
+      fixtures?.forEach((f: any) => {
+        const result = results?.find((r: any) => r.fixture_id === f.id);
+        if (!result) return;
+
+        const home = teamMap[f.home_team_id];
+        const away = teamMap[f.away_team_id];
+
+        if (!phaseMap[home])
+          phaseMap[home] = { bodovi: 0, gplus: 0, gminus: 0, gr: 0, ut: 0, p: 0, n: 0, i: 0 };
+        if (!phaseMap[away])
+          phaseMap[away] = { bodovi: 0, gplus: 0, gminus: 0, gr: 0, ut: 0, p: 0, n: 0, i: 0 };
+
+        const hg = result.home_goals;
+        const ag = result.away_goals;
+
+        phaseMap[home].ut++;
+        phaseMap[away].ut++;
+
+        phaseMap[home].gplus += hg;
+        phaseMap[home].gminus += ag;
+        phaseMap[home].gr += hg - ag;
+
+        phaseMap[away].gplus += ag;
+        phaseMap[away].gminus += hg;
+        phaseMap[away].gr += ag - hg;
+
+        if (hg > ag) {
+          phaseMap[home].bodovi += 3;
+          phaseMap[home].p++;
+          phaseMap[away].i++;
+        } else if (hg < ag) {
+          phaseMap[away].bodovi += 3;
+          phaseMap[away].p++;
+          phaseMap[home].i++;
+        } else {
+          phaseMap[home].bodovi += 1;
+          phaseMap[away].bodovi += 1;
+          phaseMap[home].n++;
+          phaseMap[away].n++;
+        }
+      });
+
+      const finalRows: TableRow[] = [];
+
+      Object.keys(phaseMap).forEach((teamName) => {
+        const reg = regMap[teamName];
+        const phase = phaseMap[teamName];
+
+        finalRows.push({
+          team_id: teamName,
+          team_name: teamName,
+          ut: phase.ut,
+          p: phase.p,
+          n: phase.n,
+          i: phase.i,
+          gplus: (reg?.gplus ?? 0) + phase.gplus,
+          gminus: (reg?.gminus ?? 0) + phase.gminus,
+          gr: (reg?.gr ?? 0) + phase.gr,
+          bodovi: (reg?.bodovi ?? 0) + phase.bodovi,
+        });
+      });
+
+      finalRows.sort((a, b) => {
+        if (b.bodovi !== a.bodovi) return b.bodovi - a.bodovi;
+        if (b.gr !== a.gr) return b.gr - a.gr;
+        return b.gplus - a.gplus;
+      });
+
+      setStandings(finalRows);
     }
 
     // --------------------------
-    // GOLD / SILVER
+    // FINAL MATCHES ZA ODABRANU LIGU
     // --------------------------
 
-    const phaseLeague =
-      leagueCode === "POC_GOLD" ? "POC_GOLD" : "POC_SILVER";
+    const finalCode = LEAGUE_DB_CODE[leagueCode].replace("_REG", "_FINAL");
 
-    // 1) REG standings
-    const { data: regStandings } = await supabase
-      .from("standings")
-      .select("*")
-      .in("league_code", ["POC_REG_A", "POC_REG_B"]);
-
-    const regMap: Record<
-      string,
-      { bodovi: number; gplus: number; gminus: number; gr: number }
-    > = {};
-
-    regStandings?.forEach((s: any) => {
-      regMap[teamMap[s.team_id]] = {
-        bodovi: s.bodovi,
-        gplus: s.gplus,
-        gminus: s.gminus,
-        gr: s.gr,
-      };
-    });
-
-    // 2) Phase fixtures + results
-    const { data: fixtures } = await supabase
+    const { data: finalFixtures } = await supabase
       .from("fixtures")
-      .select("id, home_team_id, away_team_id")
-      .eq("league_code", phaseLeague);
+      .select("id, match_date, match_time, placement_label, home_team_id, away_team_id")
+      .eq("league_code", finalCode)
+      .order("match_time", { ascending: true });
 
-    const { data: results } = await supabase
-      .from("results")
-      .select("fixture_id, home_goals, away_goals");
+    const formatted =
+      finalFixtures?.map((f: any) => ({
+        id: f.id,
+        date: new Date(f.match_date).toLocaleDateString("hr-HR"),
+        time: f.match_time?.substring(0, 5) ?? "",
+        home: teamMap[f.home_team_id] ?? "Nepoznato",
+        away: teamMap[f.away_team_id] ?? "Nepoznato",
+        placement_label: f.placement_label,
+      })) ?? [];
 
-    const phaseMap: Record<
-      string,
-      { bodovi: number; gplus: number; gminus: number; gr: number; ut: number; p: number; n: number; i: number }
-    > = {};
-
-    fixtures?.forEach((f: any) => {
-      const result = results?.find((r: any) => r.fixture_id === f.id);
-      if (!result) return;
-
-      const homeName = teamMap[f.home_team_id];
-      const awayName = teamMap[f.away_team_id];
-
-      const hg = result.home_goals;
-      const ag = result.away_goals;
-
-      if (!phaseMap[homeName])
-        phaseMap[homeName] = { bodovi: 0, gplus: 0, gminus: 0, gr: 0, ut: 0, p: 0, n: 0, i: 0 };
-      if (!phaseMap[awayName])
-        phaseMap[awayName] = { bodovi: 0, gplus: 0, gminus: 0, gr: 0, ut: 0, p: 0, n: 0, i: 0 };
-
-      phaseMap[homeName].ut++;
-      phaseMap[awayName].ut++;
-
-      phaseMap[homeName].gplus += hg;
-      phaseMap[homeName].gminus += ag;
-      phaseMap[homeName].gr += hg - ag;
-
-      phaseMap[awayName].gplus += ag;
-      phaseMap[awayName].gminus += hg;
-      phaseMap[awayName].gr += ag - hg;
-
-      if (hg > ag) {
-        phaseMap[homeName].bodovi += 3;
-        phaseMap[homeName].p++;
-        phaseMap[awayName].i++;
-      } else if (hg < ag) {
-        phaseMap[awayName].bodovi += 3;
-        phaseMap[awayName].p++;
-        phaseMap[homeName].i++;
-      } else {
-        phaseMap[homeName].bodovi += 1;
-        phaseMap[awayName].bodovi += 1;
-        phaseMap[homeName].n++;
-        phaseMap[awayName].n++;
-      }
-    });
-
-    // 3) Merge REG + Phase
-    const finalRows: TableRow[] = [];
-
-    Object.keys(phaseMap).forEach((teamName) => {
-      const reg = regMap[teamName];
-      const phase = phaseMap[teamName];
-
-      finalRows.push({
-        team_id: teamName,
-        team_name: teamName,
-        ut: phase.ut,
-        p: phase.p,
-        n: phase.n,
-        i: phase.i,
-        gplus: (reg?.gplus ?? 0) + phase.gplus,
-        gminus: (reg?.gminus ?? 0) + phase.gminus,
-        gr: (reg?.gr ?? 0) + phase.gr,
-        bodovi: (reg?.bodovi ?? 0) + phase.bodovi,
-      });
-    });
-
-    finalRows.sort((a, b) => {
-      if (b.bodovi !== a.bodovi) return b.bodovi - a.bodovi;
-      if (b.gr !== a.gr) return b.gr - a.gr;
-      return b.gplus - a.gplus;
-    });
-
-    setStandings(finalRows);
+    setFinalMatches(formatted);
     setLoading(false);
   }
 
   if (loading) return <p>Učitavanje...</p>;
 
   return (
-    <div className="bg-[#f3ebd8] p-4 rounded-xl shadow border border-[#c8b59a] text-[#1a1a1a]">
-      <h1 className="text-xl font-bold mb-4 text-[#0A5E2A]">
-        {LEAGUE_NAME[leagueCode]}
-      </h1>
+    <div className="space-y-6">
 
-      <table className="w-full text-sm">
-        <thead className="border-b border-[#c8b59a] text-[#0A5E2A]">
-          <tr>
-            <th className="py-2 w-6 text-left">#</th>
-            <th className="py-2 text-left">Klub</th>
-            <th className="py-2 w-10 text-center">UT</th>
-            <th className="py-2 w-10 text-center">P</th>
-            <th className="py-2 w-10 text-center">N</th>
-            <th className="py-2 w-10 text-center">I</th>
-            <th className="py-2 w-10 text-center">G+</th>
-            <th className="py-2 w-10 text-center">G-</th>
-            <th className="py-2 w-12 text-center">GR</th>
-            <th className="py-2 w-12 text-center">Bod</th>
-          </tr>
-        </thead>
+      {/* TABLICA */}
+      <div className="bg-[#f3ebd8] p-4 rounded-xl shadow border border-[#c8b59a] text-[#1a1a1a]">
+        <h1 className="text-xl font-bold mb-4 text-[#0A5E2A]">
+          {LEAGUE_NAME[leagueCode]}
+        </h1>
 
-        <tbody>
-          {standings.map((s, i) => (
-            <tr key={i} className="border-b border-[#e3d4bf] bg-white">
-              <td className="py-2 px-1">{i + 1}</td>
-              <td className="py-2">{s.team_name}</td>
-              <td className="py-2 text-center">{s.ut}</td>
-              <td className="py-2 text-center">{s.p}</td>
-              <td className="py-2 text-center">{s.n}</td>
-              <td className="py-2 text-center">{s.i}</td>
-              <td className="py-2 text-center">{s.gplus}</td>
-              <td className="py-2 text-center">{s.gminus}</td>
-              <td className="py-2 text-center">{s.gr}</td>
-              <td className="py-2 text-center font-bold text-[#0A5E2A]">
-                {s.bodovi}
-              </td>
+        <table className="w-full text-sm">
+          <thead className="border-b border-[#c8b59a] text-[#0A5E2A]">
+            <tr>
+              <th>#</th>
+              <th>Klub</th>
+              <th>UT</th>
+              <th>P</th>
+              <th>N</th>
+              <th>I</th>
+              <th>G+</th>
+              <th>G-</th>
+              <th>GR</th>
+              <th>Bod</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {standings.map((s, i) => (
+              <tr key={i} className="border-b border-[#e3d4bf] bg-white">
+                <td>{i + 1}</td>
+                <td>{s.team_name}</td>
+                <td>{s.ut}</td>
+                <td>{s.p}</td>
+                <td>{s.n}</td>
+                <td>{s.i}</td>
+                <td>{s.gplus}</td>
+                <td>{s.gminus}</td>
+                <td>{s.gr}</td>
+                <td className="font-bold text-[#0A5E2A]">{s.bodovi}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* FINAL MATCHES */}
+      {finalMatches.length > 0 && (
+        <div className="bg-[#0A5E2A] text-[#f7f1e6] p-4 rounded-xl shadow">
+          <h2 className="text-lg font-semibold mb-4">Finalni dan</h2>
+          <ul className="space-y-3 text-sm">
+            {finalMatches.map((m) => (
+              <li key={m.id} className="bg-[#0d6b35] px-3 py-2 rounded-lg">
+                <div className="font-medium">
+                  {m.home} — {m.away}
+                </div>
+                <div className="text-xs text-[#fcefd5]">
+                  {m.date} {m.time && `u ${m.time}`}{" "}
+                  {m.placement_label && `• ${m.placement_label}`}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
