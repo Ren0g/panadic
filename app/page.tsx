@@ -21,14 +21,12 @@ const LEAGUES: { code: LeagueCode; label: string }[] = [
 ];
 
 const LEAGUE_LABELS: Record<string, string> = {
-  // REG
   PIONIRI_REG: "Pioniri",
   MLPIONIRI_REG: "Mlađi pioniri",
   PRSTICI_REG: "Prstići",
   POC_GOLD: "Početnici – Zlatna liga",
   POC_SILVER: "Početnici – Srebrna liga",
 
-  // FINAL
   PIONIRI_FINAL: "Pioniri",
   MLPIONIRI_FINAL: "Mlađi pioniri",
   PRSTICI_FINAL: "Prstići",
@@ -43,6 +41,7 @@ type CurrentMatch = {
   id: number;
   league_name: string;
   round: number;
+  isFinal: boolean;
   match_date: string;
   match_time: string | null;
   home_team: string;
@@ -66,8 +65,6 @@ export default function HomePage() {
   useEffect(() => {
     loadMatch();
     loadFinalDay();
-    const interval = setInterval(() => loadMatch(), 10000);
-    return () => clearInterval(interval);
   }, []);
 
   async function loadMatch() {
@@ -131,6 +128,8 @@ export default function HomePage() {
     const league_name =
       LEAGUE_LABELS[chosen.league_code] ?? chosen.league_code;
 
+    const isFinal = chosen.league_code.includes("_FINAL");
+
     const { data: res } = await supabase
       .from("results")
       .select("home_goals, away_goals")
@@ -141,6 +140,7 @@ export default function HomePage() {
       id: chosen.id,
       league_name,
       round: chosen.round,
+      isFinal,
       match_date: chosen.match_date,
       match_time: chosen.match_time,
       home_team: home,
@@ -161,7 +161,6 @@ export default function HomePage() {
         league_code,
         match_date,
         match_time,
-        placement_label,
         home_team:home_team_id ( name ),
         away_team:away_team_id ( name )
       `)
@@ -200,7 +199,10 @@ export default function HomePage() {
               </span>
 
               <span>
-                {currentMatch.league_name} — {currentMatch.round}. kolo
+                {currentMatch.league_name} —{" "}
+                {currentMatch.isFinal
+                  ? "Finale"
+                  : `${currentMatch.round}. kolo`}
               </span>
             </div>
 
@@ -251,7 +253,6 @@ export default function HomePage() {
                 <div className="flex-1">
                   <div className="text-xs text-gray-500">
                     {LEAGUE_LABELS[f.league_code] ?? f.league_code}
-                    {f.placement_label ? ` • ${f.placement_label}` : ""}
                   </div>
                   <div className="font-semibold">
                     {f.home_team?.name} — {f.away_team?.name}
