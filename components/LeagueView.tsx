@@ -220,8 +220,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
       .from("fixtures")
       .select("id, match_date, match_time, home_team_id, away_team_id, placement_label")
       .eq("league_code", finalCode)
-      .eq("match_date", "2026-02-21")
-      .order("match_time", { ascending: true });
+      .eq("match_date", "2026-02-21");
 
     const fixtureIds = finalFixtures?.map((f: any) => f.id) ?? [];
 
@@ -251,6 +250,13 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         score: resultMap[String(f.id)] ?? "-:-",
       })) ?? [];
 
+    // 🔴 SORTIRANJE PO MJESTU (NE PO VREMENU)
+    formatted.sort((a, b) => {
+      const aNum = parseInt(a.placement);
+      const bNum = parseInt(b.placement);
+      return aNum - bNum;
+    });
+
     setFinalMatches(formatted);
 
     setLoading(false);
@@ -260,7 +266,6 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
 
   return (
     <div className="space-y-6">
-
       <div className="bg-[#f3ebd8] p-4 rounded-xl shadow border border-[#c8b59a] text-[#1a1a1a]">
         <h1 className="text-xl font-bold mb-4 text-[#0A5E2A]">
           {LEAGUE_NAME[leagueCode]}
