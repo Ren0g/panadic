@@ -57,14 +57,12 @@ export default function HomePage() {
   const [currentMatch, setCurrentMatch] =
     useState<CurrentMatch | null>(null);
   const [loadingMatch, setLoadingMatch] = useState(true);
-  const [finalFixtures, setFinalFixtures] = useState<any[]>([]);
 
   const currentLabel =
     LEAGUES.find((l) => l.code === selectedLeague)?.label ?? "";
 
   useEffect(() => {
     loadMatch();
-    loadFinalDay();
   }, []);
 
   async function loadMatch() {
@@ -153,24 +151,6 @@ export default function HomePage() {
     setLoadingMatch(false);
   }
 
-  async function loadFinalDay() {
-    const { data } = await supabase
-      .from("fixtures")
-      .select(`
-        id,
-        league_code,
-        match_date,
-        match_time,
-        home_team:home_team_id ( name ),
-        away_team:away_team_id ( name )
-      `)
-      .like("league_code", "%_FINAL")
-      .eq("match_date", "2026-02-21")
-      .order("match_time", { ascending: true });
-
-    if (data) setFinalFixtures(data);
-  }
-
   return (
     <div className="w-full max-w-5xl mx-auto px-4 py-10 space-y-10">
 
@@ -233,37 +213,6 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* FINAL DAY BLOCK */}
-      {finalFixtures.length > 0 && (
-        <div className="bg-white rounded-xl border border-[#d9cbb1] shadow p-5">
-          <h2 className="text-xl font-bold text-center mb-6 text-[#0A5E2A]">
-            FINAL DAY – 21.02.2026
-          </h2>
-
-          <div className="space-y-4">
-            {finalFixtures.map((f) => (
-              <div
-                key={f.id}
-                className="flex justify-between items-center border-b pb-3"
-              >
-                <div className="w-16 font-bold text-[#0A5E2A]">
-                  {f.match_time?.substring(0, 5)}
-                </div>
-
-                <div className="flex-1">
-                  <div className="text-xs text-gray-500">
-                    {LEAGUE_LABELS[f.league_code] ?? f.league_code}
-                  </div>
-                  <div className="font-semibold">
-                    {f.home_team?.name} — {f.away_team?.name}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* LEAGUE SELECTOR */}
       <div className="flex justify-center">
         <LeagueSelector
@@ -277,7 +226,7 @@ export default function HomePage() {
         <div className="rounded-xl border border-[#d9cbb1] bg-white px-6 py-8 text-center shadow max-w-xl mx-auto">
           <p className="text-lg font-medium mb-2">Odaberi ligu iz izbornika.</p>
           <p className="text-sm text-gray-600">
-            Nakon odabira prikazat će se tablica i sljedeće kolo.
+            Nakon odabira prikazat će se tablica i utakmice te lige.
           </p>
         </div>
       )}
