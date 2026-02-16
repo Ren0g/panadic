@@ -7,14 +7,42 @@ import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 
 const LEAGUE_LABELS: Record<string, string> = {
+  // REG
   PIONIRI_REG: "Pioniri",
   MLPIONIRI_REG: "Mlađi pioniri",
   PRSTICI_REG: "Prstići",
   POC_REG_A: "Početnici A",
   POC_REG_B: "Početnici B",
-  POC_GOLD: "Početnici – Zlatna liga",
-  POC_SILVER: "Početnici – Srebrna liga",
+  POC_GOLD: "Zlatna liga",
+  POC_SILVER: "Srebrna liga",
+
+  // BASE (bez sufiksa)
+  PIONIRI: "Pioniri",
+  MLPIONIRI: "Mlađi pioniri",
+  PRSTICI: "Prstići",
+  POC_GOLD_BASE: "Zlatna liga",
+  POC_SILVER_BASE: "Srebrna liga",
 };
+
+function formatLeagueName(code: string) {
+  const isFinal = code.endsWith("_FINAL");
+
+  const baseCode = code
+    .replace("_FINAL", "")
+    .replace("_REG", "");
+
+  const pretty =
+    LEAGUE_LABELS[code] ||
+    LEAGUE_LABELS[baseCode] ||
+    LEAGUE_LABELS[`${baseCode}_BASE`] ||
+    baseCode;
+
+  if (isFinal) {
+    return `${pretty} - Finale`;
+  }
+
+  return pretty;
+}
 
 export default function LiveMatchesPage() {
   const today = new Date().toISOString().slice(0, 10);
@@ -60,8 +88,8 @@ export default function LiveMatchesPage() {
 
     const parsed = fixtures.map((f) => ({
       id: Number(f.id),
-      league: LEAGUE_LABELS[f.league_code] ?? f.league_code,
-      round: f.round,
+      league: formatLeagueName(f.league_code),
+      round: f.league_code.endsWith("_FINAL") ? "Finale" : f.round,
       match_time: f.match_time?.substring(0, 5) ?? "",
       home_team: teamMap[Number(f.home_team_id)] ?? "Nepoznato",
       away_team: teamMap[Number(f.away_team_id)] ?? "Nepoznato",
@@ -119,7 +147,11 @@ export default function LiveMatchesPage() {
               </div>
               <div className="text-xs text-right text-gray-600">
                 <div>{m.league}</div>
-                <div>{m.round}. kolo</div>
+                <div>
+                  {typeof m.round === "string"
+                    ? m.round
+                    : `${m.round}. kolo`}
+                </div>
               </div>
             </div>
           </Link>
