@@ -56,6 +56,8 @@ type FinalMatch = {
   placement_label: string | null;
 };
 
+const FINAL_DAY_ISO = "2026-02-21";
+
 export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
   const [standings, setStandings] = useState<TableRow[]>([]);
   const [finalMatches, setFinalMatches] = useState<FinalMatch[]>([]);
@@ -63,14 +65,13 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueCode]);
 
   async function loadData() {
     setLoading(true);
 
-    const { data: teams } = await supabase
-      .from("teams")
-      .select("id,name");
+    const { data: teams } = await supabase.from("teams").select("id,name");
 
     const teamMap: Record<string, string> = {};
     (teams || []).forEach((t: any) => {
@@ -78,9 +79,8 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
     });
 
     // ---------------------------
-    // STANDINGS (NETAKNUTA LOGIKA)
+    // STANDINGS (kako je bilo)
     // ---------------------------
-
     const dbLeagueCode = LEAGUE_DB_CODE[leagueCode];
 
     const { data: rawStandings } = await supabase
@@ -101,31 +101,41 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
     setStandings(final);
 
     // ---------------------------
-    // FINAL MATCHES
+    // FINAL MATCHES (PO LIGI)
     // ---------------------------
-
     const finalCode = FINAL_DB_CODE[leagueCode];
 
+    // Povuci SVE finalne utakmice te lige (bez hard filtera po datumu)
     const { data: finalFixtures } = await supabase
       .from("fixtures")
       .select(
         "id, match_date, match_time, placement_label, home_team_id, away_team_id"
       )
       .eq("league_code", finalCode)
-      .eq("match_date", "2026-02-21")
+      .order("match_date", { ascending: true })
       .order("match_time", { ascending: true });
 
-    const formatted =
-      finalFixtures?.map((f: any) => ({
-        id: f.id,
+    const allFinal = finalFixtures ?? [];
+
+    // Pokušaj uzeti baš 21.02.2026 (ako u bazi točno postoji)
+    const finalDay = allFinal.filter((f: any) => f.match_date === FINAL_DAY_ISO);
+
+    // Ako nema nijedne za taj datum (zbog različitog zapisa u bazi),
+    // prikaži sve finalne za tu ligu umjesto praznog ekrana.
+    const toShow = finalDay.length > 0 ? finalDay : allFinal;
+
+    const formatted: FinalMatch[] =
+      toShow.map((f: any) => ({
+        id: String(f.id),
         date: new Date(f.match_date).toLocaleDateString("hr-HR"),
         time: f.match_time?.substring(0, 5) ?? "",
         home: teamMap[f.home_team_id] ?? "Nepoznato",
         away: teamMap[f.away_team_id] ?? "Nepoznato",
-        placement_label: f.placement_label,
+        placement_label: f.placement_label ?? null,
       })) ?? [];
 
     setFinalMatches(formatted);
+
     setLoading(false);
   }
 
@@ -133,7 +143,6 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
 
   return (
     <div className="space-y-6">
-
       {/* TABLICA – ORIGINALNI IZGLED */}
       <div className="bg-[#f3ebd8] p-4 rounded-xl shadow border border-[#c8b59a] text-[#1a1a1a]">
         <h1 className="text-xl font-bold mb-4 text-[#0A5E2A]">
@@ -180,10 +189,13 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         </table>
       </div>
 
-      {/* FINAL DAY ISPRAVNO */}
+      {/* FINAL UTKMICE ODABRANE LIGE */}
       {finalMatches.length > 0 && (
         <div className="bg-[#0A5E2A] text-[#f7f1e6] p-4 rounded-xl shadow">
-          <h2 className="text-lg font-semibold mb-4">Finalni dan – 21.02.2026</h2>
+          <h2 className="text-lg font-semibold mb-4">
+            Finalne utakmice (21.02.2026)
+          </h2>
+
           <ul className="space-y-3 text-sm">
             {finalMatches.map((m) => (
               <li
