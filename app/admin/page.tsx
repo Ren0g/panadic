@@ -144,7 +144,7 @@ export default function AdminPage() {
           onClick={() => (window.location.href = "/api/reports/final")}
           className="px-6 py-3 rounded-full bg-[#0A5E2A] hover:bg-[#08471f] text-white shadow font-semibold"
         >
-          📄 FINAL DAY DOCX
+          📄 Završni izvještaj
         </button>
       </div>
 
