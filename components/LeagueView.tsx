@@ -53,6 +53,8 @@ type FinalMatch = {
   time: string;
   home: string;
   away: string;
+  placement: string;
+  score: string;
 };
 
 export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
@@ -109,7 +111,6 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
       const phaseLeague =
         leagueCode === "POC_GOLD" ? "POC_GOLD" : "POC_SILVER";
 
-      // REG standings
       const { data: regStandings } = await supabase
         .from("standings")
         .select("*")
@@ -129,7 +130,6 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         };
       });
 
-      // Phase fixtures
       const { data: fixtures } = await supabase
         .from("fixtures")
         .select("id, home_team_id, away_team_id")
@@ -139,19 +139,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         .from("results")
         .select("fixture_id, home_goals, away_goals");
 
-      const phaseMap: Record<
-        string,
-        {
-          bodovi: number;
-          gplus: number;
-          gminus: number;
-          gr: number;
-          ut: number;
-          p: number;
-          n: number;
-          i: number;
-        }
-      > = {};
+      const phaseMap: any = {};
 
       fixtures?.forEach((f: any) => {
         const result = results?.find((r: any) => r.fixture_id === f.id);
@@ -161,28 +149,9 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         const away = f.away_team_id;
 
         if (!phaseMap[home])
-          phaseMap[home] = {
-            bodovi: 0,
-            gplus: 0,
-            gminus: 0,
-            gr: 0,
-            ut: 0,
-            p: 0,
-            n: 0,
-            i: 0,
-          };
-
+          phaseMap[home] = { bodovi: 0, gplus: 0, gminus: 0, gr: 0, ut: 0, p: 0, n: 0, i: 0 };
         if (!phaseMap[away])
-          phaseMap[away] = {
-            bodovi: 0,
-            gplus: 0,
-            gminus: 0,
-            gr: 0,
-            ut: 0,
-            p: 0,
-            n: 0,
-            i: 0,
-          };
+          phaseMap[away] = { bodovi: 0, gplus: 0, gminus: 0, gr: 0, ut: 0, p: 0, n: 0, i: 0 };
 
         const hg = result.home_goals;
         const ag = result.away_goals;
@@ -207,8 +176,8 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
           phaseMap[away].p++;
           phaseMap[home].i++;
         } else {
-          phaseMap[home].bodovi += 1;
-          phaseMap[away].bodovi += 1;
+          phaseMap[home].bodovi++;
+          phaseMap[away].bodovi++;
           phaseMap[home].n++;
           phaseMap[away].n++;
         }
@@ -249,10 +218,27 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
 
     const { data: finalFixtures } = await supabase
       .from("fixtures")
-      .select("id, match_date, match_time, home_team_id, away_team_id")
+      .select("id, match_date, match_time, home_team_id, away_team_id, placement_label")
       .eq("league_code", finalCode)
       .eq("match_date", "2026-02-21")
       .order("match_time", { ascending: true });
+
+    const fixtureIds = finalFixtures?.map((f: any) => f.id) ?? [];
+
+    let resultMap: Record<string, string> = {};
+
+    if (fixtureIds.length > 0) {
+      const { data: results } = await supabase
+        .from("results")
+        .select("fixture_id, home_goals, away_goals")
+        .in("fixture_id", fixtureIds);
+
+      results?.forEach((r: any) => {
+        if (r.home_goals !== null && r.away_goals !== null) {
+          resultMap[String(r.fixture_id)] = `${r.home_goals}:${r.away_goals}`;
+        }
+      });
+    }
 
     const formatted =
       finalFixtures?.map((f: any) => ({
@@ -261,6 +247,8 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         time: f.match_time?.substring(0, 5) ?? "",
         home: teamMap[f.home_team_id] ?? "Nepoznato",
         away: teamMap[f.away_team_id] ?? "Nepoznato",
+        placement: f.placement_label ?? "",
+        score: resultMap[String(f.id)] ?? "-:-",
       })) ?? [];
 
     setFinalMatches(formatted);
@@ -273,7 +261,6 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
   return (
     <div className="space-y-6">
 
-      {/* TABLICA – NEDIRANA */}
       <div className="bg-[#f3ebd8] p-4 rounded-xl shadow border border-[#c8b59a] text-[#1a1a1a]">
         <h1 className="text-xl font-bold mb-4 text-[#0A5E2A]">
           {LEAGUE_NAME[leagueCode]}
@@ -316,7 +303,6 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         </table>
       </div>
 
-      {/* FINAL DAN */}
       {finalMatches.length > 0 && (
         <div className="bg-[#0A5E2A] text-[#f7f1e6] p-4 rounded-xl shadow">
           <h2 className="text-lg font-semibold mb-4">
@@ -328,11 +314,11 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
                 key={m.id}
                 className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-[#0d6b35] px-3 py-2 rounded-lg"
               >
-                <span className="font-medium">
-                  {m.home} — {m.away}
+                <span className="font-semibold">
+                  {m.placement} — {m.home} — {m.away}
                 </span>
                 <span className="sm:text-right text-[#fcefd5]">
-                  {m.date} u {m.time}
+                  {m.date} u {m.time} | {m.score}
                 </span>
               </li>
             ))}
