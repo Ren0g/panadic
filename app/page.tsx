@@ -21,19 +21,11 @@ const LEAGUES: { code: LeagueCode; label: string }[] = [
 ];
 
 const LEAGUE_LABELS: Record<string, string> = {
-  // REG
   PIONIRI_REG: "Pioniri",
   MLPIONIRI_REG: "Mlađi pioniri",
   PRSTICI_REG: "Prstići",
   POC_GOLD: "Početnici – Zlatna liga",
   POC_SILVER: "Početnici – Srebrna liga",
-
-  // FINAL
-  PIONIRI_FINAL: "Pioniri",
-  MLPIONIRI_FINAL: "Mlađi pioniri",
-  PRSTICI_FINAL: "Prstići",
-  POC_GOLD_FINAL: "Početnici – Zlatna liga",
-  POC_SILVER_FINAL: "Početnici – Srebrna liga",
 };
 
 const LIVE_WINDOW_BEFORE_MS = 5 * 60 * 1000;
@@ -250,7 +242,7 @@ export default function HomePage() {
 
                 <div className="flex-1">
                   <div className="text-xs text-gray-500">
-                    {LEAGUE_LABELS[f.league_code] ?? f.league_code}
+                    {f.league_code.replace("_FINAL", "")}
                     {f.placement_label ? ` • ${f.placement_label}` : ""}
                   </div>
                   <div className="font-semibold">
