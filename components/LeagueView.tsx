@@ -55,8 +55,6 @@ type FinalMatch = {
   away: string;
 };
 
-const FINAL_DAY_ISO = "2026-02-21";
-
 export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
   const [standings, setStandings] = useState<TableRow[]>([]);
   const [finalMatches, setFinalMatches] = useState<FinalMatch[]>([]);
@@ -64,7 +62,6 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueCode]);
 
   async function loadData() {
@@ -77,73 +74,206 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
       teamMap[t.id] = t.name;
     });
 
-    // ---------------------------
-    // STANDINGS (kako je bilo)
-    // ---------------------------
-    const dbLeagueCode = LEAGUE_DB_CODE[leagueCode];
+    // --------------------------
+    // NORMAL LIGE
+    // --------------------------
+    if (
+      leagueCode === "PIONIRI" ||
+      leagueCode === "MLADJI" ||
+      leagueCode === "PRSTICI"
+    ) {
+      const dbLeagueCode = LEAGUE_DB_CODE[leagueCode];
 
-    const { data: rawStandings, error: standingsErr } = await supabase
-      .from("standings")
-      .select("*")
-      .eq("league_code", dbLeagueCode)
-      .order("bodovi", { ascending: false })
-      .order("gr", { ascending: false })
-      .order("gplus", { ascending: false })
-      .order("gminus", { ascending: true });
+      const { data: rawStandings } = await supabase
+        .from("standings")
+        .select("*")
+        .eq("league_code", dbLeagueCode)
+        .order("bodovi", { ascending: false })
+        .order("gr", { ascending: false })
+        .order("gplus", { ascending: false })
+        .order("gminus", { ascending: true });
 
-    const final =
-      rawStandings?.map((s: any) => ({
-        ...s,
-        team_name: teamMap[s.team_id] ?? "Nepoznato",
-      })) ?? [];
+      const final =
+        rawStandings?.map((s: any) => ({
+          ...s,
+          team_name: teamMap[s.team_id] ?? "Nepoznato",
+        })) ?? [];
 
-    // Ako standings uopće ne postoji za tu ligu, barem ne rušimo prikaz
-    if (!standingsErr) setStandings(final);
+      setStandings(final);
+    }
 
-    // ---------------------------
-    // FINAL MATCHES (PO LIGI)
-    // ---------------------------
+    // --------------------------
+    // GOLD / SILVER
+    // --------------------------
+    if (leagueCode === "POC_GOLD" || leagueCode === "POC_SILVER") {
+      const phaseLeague =
+        leagueCode === "POC_GOLD" ? "POC_GOLD" : "POC_SILVER";
+
+      // REG standings
+      const { data: regStandings } = await supabase
+        .from("standings")
+        .select("*")
+        .in("league_code", ["POC_REG_A", "POC_REG_B"]);
+
+      const regMap: Record<
+        string,
+        { bodovi: number; gplus: number; gminus: number; gr: number }
+      > = {};
+
+      regStandings?.forEach((s: any) => {
+        regMap[s.team_id] = {
+          bodovi: s.bodovi,
+          gplus: s.gplus,
+          gminus: s.gminus,
+          gr: s.gr,
+        };
+      });
+
+      // Phase fixtures
+      const { data: fixtures } = await supabase
+        .from("fixtures")
+        .select("id, home_team_id, away_team_id")
+        .eq("league_code", phaseLeague);
+
+      const { data: results } = await supabase
+        .from("results")
+        .select("fixture_id, home_goals, away_goals");
+
+      const phaseMap: Record<
+        string,
+        {
+          bodovi: number;
+          gplus: number;
+          gminus: number;
+          gr: number;
+          ut: number;
+          p: number;
+          n: number;
+          i: number;
+        }
+      > = {};
+
+      fixtures?.forEach((f: any) => {
+        const result = results?.find((r: any) => r.fixture_id === f.id);
+        if (!result) return;
+
+        const home = f.home_team_id;
+        const away = f.away_team_id;
+
+        if (!phaseMap[home])
+          phaseMap[home] = {
+            bodovi: 0,
+            gplus: 0,
+            gminus: 0,
+            gr: 0,
+            ut: 0,
+            p: 0,
+            n: 0,
+            i: 0,
+          };
+
+        if (!phaseMap[away])
+          phaseMap[away] = {
+            bodovi: 0,
+            gplus: 0,
+            gminus: 0,
+            gr: 0,
+            ut: 0,
+            p: 0,
+            n: 0,
+            i: 0,
+          };
+
+        const hg = result.home_goals;
+        const ag = result.away_goals;
+
+        phaseMap[home].ut++;
+        phaseMap[away].ut++;
+
+        phaseMap[home].gplus += hg;
+        phaseMap[home].gminus += ag;
+        phaseMap[home].gr += hg - ag;
+
+        phaseMap[away].gplus += ag;
+        phaseMap[away].gminus += hg;
+        phaseMap[away].gr += ag - hg;
+
+        if (hg > ag) {
+          phaseMap[home].bodovi += 3;
+          phaseMap[home].p++;
+          phaseMap[away].i++;
+        } else if (hg < ag) {
+          phaseMap[away].bodovi += 3;
+          phaseMap[away].p++;
+          phaseMap[home].i++;
+        } else {
+          phaseMap[home].bodovi += 1;
+          phaseMap[away].bodovi += 1;
+          phaseMap[home].n++;
+          phaseMap[away].n++;
+        }
+      });
+
+      const finalRows: TableRow[] = [];
+
+      Object.keys(phaseMap).forEach((teamId) => {
+        const reg = regMap[teamId];
+
+        finalRows.push({
+          team_id: teamId,
+          team_name: teamMap[teamId] ?? "Nepoznato",
+          ut: phaseMap[teamId].ut,
+          p: phaseMap[teamId].p,
+          n: phaseMap[teamId].n,
+          i: phaseMap[teamId].i,
+          gplus: (reg?.gplus ?? 0) + phaseMap[teamId].gplus,
+          gminus: (reg?.gminus ?? 0) + phaseMap[teamId].gminus,
+          gr: (reg?.gr ?? 0) + phaseMap[teamId].gr,
+          bodovi: (reg?.bodovi ?? 0) + phaseMap[teamId].bodovi,
+        });
+      });
+
+      finalRows.sort((a, b) => {
+        if (b.bodovi !== a.bodovi) return b.bodovi - a.bodovi;
+        if (b.gr !== a.gr) return b.gr - a.gr;
+        return b.gplus - a.gplus;
+      });
+
+      setStandings(finalRows);
+    }
+
+    // --------------------------
+    // FINAL MATCHES
+    // --------------------------
     const finalCode = FINAL_DB_CODE[leagueCode];
 
-    const { data: finalFixtures, error: finalErr } = await supabase
+    const { data: finalFixtures } = await supabase
       .from("fixtures")
       .select("id, match_date, match_time, home_team_id, away_team_id")
       .eq("league_code", finalCode)
-      .order("match_date", { ascending: true })
+      .eq("match_date", "2026-02-21")
       .order("match_time", { ascending: true });
 
-    if (finalErr || !finalFixtures) {
-      setFinalMatches([]);
-      setLoading(false);
-      return;
-    }
-
-    const allFinal = finalFixtures;
-
-    // Prvo probaj baš taj datum
-    const finalDay = allFinal.filter((f: any) => f.match_date === FINAL_DAY_ISO);
-
-    // Ako nema ništa za taj datum (različit zapis u bazi), pokaži sve finalne te lige
-    const toShow = finalDay.length > 0 ? finalDay : allFinal;
-
-    const formatted: FinalMatch[] = toShow.map((f: any) => ({
-      id: String(f.id),
-      date: new Date(f.match_date).toLocaleDateString("hr-HR"),
-      time: f.match_time?.substring(0, 5) ?? "",
-      home: teamMap[f.home_team_id] ?? "Nepoznato",
-      away: teamMap[f.away_team_id] ?? "Nepoznato",
-    }));
+    const formatted =
+      finalFixtures?.map((f: any) => ({
+        id: String(f.id),
+        date: new Date(f.match_date).toLocaleDateString("hr-HR"),
+        time: f.match_time?.substring(0, 5) ?? "",
+        home: teamMap[f.home_team_id] ?? "Nepoznato",
+        away: teamMap[f.away_team_id] ?? "Nepoznato",
+      })) ?? [];
 
     setFinalMatches(formatted);
 
     setLoading(false);
   }
 
-  if (loading) return <p className="text-black">Učitavanje...</p>;
+  if (loading) return <p>Učitavanje...</p>;
 
   return (
     <div className="space-y-6">
-      {/* TABLICA – ORIGINALNI IZGLED */}
+
+      {/* TABLICA – NEDIRANA */}
       <div className="bg-[#f3ebd8] p-4 rounded-xl shadow border border-[#c8b59a] text-[#1a1a1a]">
         <h1 className="text-xl font-bold mb-4 text-[#0A5E2A]">
           {LEAGUE_NAME[leagueCode]}
@@ -167,10 +297,7 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
 
           <tbody>
             {standings.map((s, i) => (
-              <tr
-                key={s.team_id}
-                className="border-b border-[#e3d4bf] bg-white"
-              >
+              <tr key={s.team_id} className="border-b border-[#e3d4bf] bg-white">
                 <td className="py-2 px-1">{i + 1}</td>
                 <td className="py-2">{s.team_name}</td>
                 <td className="py-2 text-center">{s.ut}</td>
@@ -189,13 +316,12 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
         </table>
       </div>
 
-      {/* FINAL UTKMICE ODABRANE LIGE */}
+      {/* FINAL DAN */}
       {finalMatches.length > 0 && (
         <div className="bg-[#0A5E2A] text-[#f7f1e6] p-4 rounded-xl shadow">
           <h2 className="text-lg font-semibold mb-4">
-            Finalne utakmice (21.02.2026)
+            Finalne utakmice – 21.02.2026
           </h2>
-
           <ul className="space-y-3 text-sm">
             {finalMatches.map((m) => (
               <li
@@ -205,9 +331,8 @@ export default function LeagueView({ leagueCode }: { leagueCode: LeagueCode }) {
                 <span className="font-medium">
                   {m.home} — {m.away}
                 </span>
-
                 <span className="sm:text-right text-[#fcefd5]">
-                  {m.date} {m.time && `u ${m.time}`}
+                  {m.date} u {m.time}
                 </span>
               </li>
             ))}
