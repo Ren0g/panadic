@@ -6,8 +6,6 @@ type LeagueCode =
   | "PIONIRI"
   | "MLADJI"
   | "PRSTICI"
-  | "POC_A"
-  | "POC_B"
   | "POC_GOLD"
   | "POC_SILVER";
 
@@ -34,7 +32,6 @@ export function LeagueSelector({
 
   return (
     <div className="relative">
-      {/* BUTTON */}
       <button
         onClick={() => setOpen(!open)}
         className="inline-flex items-center gap-2 rounded-full bg-[#f7f1e6] px-4 py-2 text-sm font-medium text-[#0b5b2a] shadow hover:bg-white transition"
@@ -43,7 +40,6 @@ export function LeagueSelector({
         <span className="text-xs">▼</span>
       </button>
 
-      {/* DROPDOWN LIST */}
       {open && (
         <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white shadow-lg border border-[#e2d5bd] z-20">
           <ul className="py-1 text-sm text-gray-800">
