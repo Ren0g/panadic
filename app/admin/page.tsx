@@ -79,7 +79,6 @@ export default function AdminPage() {
     setLoading(false);
   }
 
-  // LOGIN SCREEN
   if (!authorized) {
     return (
       <form
@@ -102,11 +101,9 @@ export default function AdminPage() {
     );
   }
 
-  // ADMIN PANEL
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-10">
       
-      {/* HEADER */}
       <div className="flex items-center justify-between">
         <button
           onClick={() => (window.location.href = "/")}
@@ -142,6 +139,13 @@ export default function AdminPage() {
         >
           🔧 Modifikacija susreta
         </button>
+
+        <button
+          onClick={() => (window.location.href = "/api/reports/final")}
+          className="px-6 py-3 rounded-full bg-[#0A5E2A] hover:bg-[#08471f] text-white shadow font-semibold"
+        >
+          📄 FINAL DAY DOCX
+        </button>
       </div>
 
       {/* ODABIR LIGE */}
@@ -167,7 +171,6 @@ export default function AdminPage() {
         </select>
       </div>
 
-      {/* SWITCH */}
       {league && (
         <div className="flex justify-center gap-4">
           <button
